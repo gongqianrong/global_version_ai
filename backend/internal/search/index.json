@@ -1,0 +1,44 @@
+{
+  "settings": {
+    "analysis": {
+      "analyzer": {
+        "ja_analyzer": {
+          "type": "custom",
+          "tokenizer": "kuromoji_tokenizer",
+          "filter": ["kuromoji_baseform", "kuromoji_part_of_speech", "cjk_width", "lowercase"]
+        },
+        "multilang_analyzer": {
+          "type": "custom",
+          "tokenizer": "icu_tokenizer",
+          "filter": ["icu_folding", "lowercase"]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "id": {"type": "keyword"},
+      "source_platform": {"type": "keyword"},
+      "status": {"type": "keyword"},
+      "title": {"type": "text", "analyzer": "ja_analyzer", "fields": {"keyword": {"type": "keyword"}}},
+      "title_en": {"type": "text", "analyzer": "multilang_analyzer"},
+      "title_zh_tw": {"type": "text", "analyzer": "multilang_analyzer"},
+      "description": {"type": "text", "analyzer": "ja_analyzer"},
+      "brand_id": {"type": "keyword"},
+      "brand_name": {"type": "keyword"},
+      "brand_name_ja": {"type": "text", "analyzer": "ja_analyzer", "fields": {"keyword": {"type": "keyword"}}},
+      "categories": {"type": "keyword"},
+      "tags": {"type": "keyword"},
+      "condition": {"type": "keyword"},
+      "content_rating": {"type": "keyword"},
+      "price_jpy": {"type": "long"},
+      "shipping_type": {"type": "keyword"},
+      "seller_id": {"type": "keyword"},
+      "seller_rating": {"type": "float"},
+      "listed_at": {"type": "date"},
+      "collected_at": {"type": "date"},
+      "updated_at": {"type": "date"},
+      "images": {"type": "keyword", "index": false}
+    }
+  }
+}
