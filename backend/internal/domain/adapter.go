@@ -58,14 +58,14 @@ type PlatformAdapter interface {
 	Capabilities() AdapterCaps
 
 	// Search performs a keyword search on the platform and returns raw results.
-	Search(ctx context.Context, keyword string, page, pageSize int) (*SearchResult, error)
+	Search(ctx context.Context, query SearchQuery) (*SearchResult, error)
 
 	// GetProduct fetches a single product by its platform-specific ID.
 	GetProduct(ctx context.Context, productID string) (*RawProduct, error)
 
 	// BatchCollect runs a batch collection job with the given parameters.
-	BatchCollect(ctx context.Context, params CollectParams) ([]RawProduct, error)
+	BatchCollect(ctx context.Context, params CollectParams) (<-chan RawProduct, error)
 
 	// HealthCheck returns the current health status of the adapter.
-	HealthCheck(ctx context.Context) (*HealthStatus, error)
+	HealthCheck(ctx context.Context) HealthStatus
 }

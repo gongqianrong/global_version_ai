@@ -62,8 +62,8 @@ func (a *Adapter) Capabilities() domain.AdapterCaps {
 }
 
 // Search calls the domestic API's /api/search endpoint with the given
-// parameters and converts the response into a domain.SearchResult.
-func (a *Adapter) Search(ctx context.Context, keyword string, page, pageSize int) (*domain.SearchResult, error) {
+// query and converts the response into a domain.SearchResult.
+func (a *Adapter) Search(ctx context.Context, query domain.SearchQuery) (*domain.SearchResult, error) {
 	u, err := url.Parse(a.domesticURL + "/api/search")
 	if err != nil {
 		return nil, fmt.Errorf("domestic: parse URL: %w", err)
@@ -71,9 +71,9 @@ func (a *Adapter) Search(ctx context.Context, keyword string, page, pageSize int
 
 	q := u.Query()
 	q.Set("platform", a.platformID)
-	q.Set("keyword", keyword)
-	q.Set("page", strconv.Itoa(page))
-	q.Set("page_size", strconv.Itoa(pageSize))
+	q.Set("keyword", query.Keyword)
+	q.Set("page", strconv.Itoa(query.Page))
+	q.Set("page_size", strconv.Itoa(query.PageSize))
 	u.RawQuery = q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
@@ -109,7 +109,7 @@ func (a *Adapter) Search(ctx context.Context, keyword string, page, pageSize int
 		})
 	}
 
-	hasMore := int64(page*pageSize) < body.Total
+	hasMore := int64(query.Page*query.PageSize) < body.Total
 
 	return &domain.SearchResult{
 		Products: products,
@@ -124,33 +124,39 @@ func (a *Adapter) GetProduct(_ context.Context, _ string) (*domain.RawProduct, e
 }
 
 // BatchCollect is not yet implemented for the domestic proxy adapter.
-func (a *Adapter) BatchCollect(_ context.Context, _ domain.CollectParams) ([]domain.RawProduct, error) {
+func (a *Adapter) BatchCollect(_ context.Context, _ domain.CollectParams) (<-chan domain.RawProduct, error) {
 	return nil, fmt.Errorf("domestic: BatchCollect not yet implemented")
 }
 
 // HealthCheck calls the domestic API's /health endpoint and reports whether
 // the service is healthy.
-func (a *Adapter) HealthCheck(ctx context.Context) (*domain.HealthStatus, error) {
+func (a *Adapter) HealthCheck(ctx context.Context) domain.HealthStatus {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.domesticURL+"/health", nil)
 	if err != nil {
-		return nil, fmt.Errorf("domestic: create health request: %w", err)
+		return domain.HealthStatus{
+			Status:  "unhealthy",
+			Message: fmt.Sprintf("domestic: create health request: %v", err),
+		}
 	}
 
 	resp, err := a.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("domestic: health request: %w", err)
+		return domain.HealthStatus{
+			Status:  "unhealthy",
+			Message: fmt.Sprintf("domestic: health request: %v", err),
+		}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
-		return &domain.HealthStatus{
+		return domain.HealthStatus{
 			Status:  "healthy",
 			Message: "domestic API is reachable",
-		}, nil
+		}
 	}
 
-	return &domain.HealthStatus{
+	return domain.HealthStatus{
 		Status:  "unhealthy",
 		Message: fmt.Sprintf("domestic API returned status %d", resp.StatusCode),
-	}, nil
+	}
 }

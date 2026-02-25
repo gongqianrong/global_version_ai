@@ -15,17 +15,17 @@ type mockAdapter struct {
 
 func (m *mockAdapter) PlatformID() string                { return m.id }
 func (m *mockAdapter) Capabilities() domain.AdapterCaps  { return m.caps }
-func (m *mockAdapter) Search(_ context.Context, _ string, _, _ int) (*domain.SearchResult, error) {
+func (m *mockAdapter) Search(_ context.Context, _ domain.SearchQuery) (*domain.SearchResult, error) {
 	return &domain.SearchResult{}, nil
 }
 func (m *mockAdapter) GetProduct(_ context.Context, _ string) (*domain.RawProduct, error) {
 	return nil, nil
 }
-func (m *mockAdapter) BatchCollect(_ context.Context, _ domain.CollectParams) ([]domain.RawProduct, error) {
+func (m *mockAdapter) BatchCollect(_ context.Context, _ domain.CollectParams) (<-chan domain.RawProduct, error) {
 	return nil, nil
 }
-func (m *mockAdapter) HealthCheck(_ context.Context) (*domain.HealthStatus, error) {
-	return &domain.HealthStatus{Status: "healthy"}, nil
+func (m *mockAdapter) HealthCheck(_ context.Context) domain.HealthStatus {
+	return domain.HealthStatus{Status: "healthy"}
 }
 
 func TestRegisterAndGetAdapter(t *testing.T) {

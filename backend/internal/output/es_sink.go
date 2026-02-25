@@ -8,7 +8,14 @@ import (
 
 // ESSink is a stub Elasticsearch output sink. The Write method is a no-op
 // for now and will be wired to a real ES client in a later task.
-type ESSink struct{}
+type ESSink struct {
+	indexName string
+}
+
+// NewESSink creates an ESSink that targets the given Elasticsearch index.
+func NewESSink(indexName string) *ESSink {
+	return &ESSink{indexName: indexName}
+}
 
 // Name returns the sink identifier.
 func (s *ESSink) Name() string { return "elasticsearch" }

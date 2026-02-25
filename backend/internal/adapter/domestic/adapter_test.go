@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/rakutao/collection-gateway/internal/domain"
 )
 
 func TestPlatformID(t *testing.T) {
@@ -53,7 +55,11 @@ func TestSearch(t *testing.T) {
 	defer srv.Close()
 
 	a := New("mercari", srv.URL, http.DefaultClient)
-	result, err := a.Search(context.Background(), "nike", 1, 20)
+	result, err := a.Search(context.Background(), domain.SearchQuery{
+		Keyword:  "nike",
+		Page:     1,
+		PageSize: 20,
+	})
 	if err != nil {
 		t.Fatalf("Search returned unexpected error: %v", err)
 	}
@@ -94,10 +100,7 @@ func TestHealthCheck(t *testing.T) {
 	defer srv.Close()
 
 	a := New("mercari", srv.URL, http.DefaultClient)
-	status, err := a.HealthCheck(context.Background())
-	if err != nil {
-		t.Fatalf("HealthCheck returned unexpected error: %v", err)
-	}
+	status := a.HealthCheck(context.Background())
 	if status.Status != "healthy" {
 		t.Errorf("HealthCheck().Status = %q, want %q", status.Status, "healthy")
 	}

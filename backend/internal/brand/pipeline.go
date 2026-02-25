@@ -156,3 +156,21 @@ func (p *Pipeline) level3(title, description, category string) *domain.Brand {
 		Source: "ai_extracted",
 	}
 }
+
+// PipelineAdapter wraps a Pipeline to satisfy the normalizer.BrandExtractor
+// interface, bridging the brand identification pipeline with the normalizer.
+type PipelineAdapter struct {
+	pipeline *Pipeline
+}
+
+// NewPipelineAdapter creates a PipelineAdapter that delegates to the given Pipeline.
+func NewPipelineAdapter(pipeline *Pipeline) *PipelineAdapter {
+	return &PipelineAdapter{pipeline: pipeline}
+}
+
+// Extract implements the BrandExtractor interface by delegating to
+// Pipeline.Identify with nil rawData.
+func (a *PipelineAdapter) Extract(title, description, category string) (*domain.Brand, error) {
+	brand := a.pipeline.Identify(nil, title, description, category)
+	return brand, nil
+}

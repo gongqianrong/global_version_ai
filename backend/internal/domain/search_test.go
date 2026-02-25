@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestSearchQuery_IsGlobalSearch_NoPlaftorms(t *testing.T) {
+func TestSearchQuery_IsGlobalSearch_NoPlatforms(t *testing.T) {
 	q := SearchQuery{Keyword: "gucci bag"}
 	if !q.IsGlobalSearch() {
 		t.Error("IsGlobalSearch() should return true when no platforms are specified")

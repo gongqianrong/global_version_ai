@@ -64,6 +64,8 @@ func (n *Normalizer) Normalize(platform string, raw domain.RawProduct) (*domain.
 		SourceCategory: category,
 		Status:         mapStatus(statusStr),
 		Condition:      mapCondition(conditionStr),
+		Quantity:        1,
+		ContentRating:   domain.ContentRatingGeneral,
 		CollectedAt:    time.Now(),
 		UpdatedAt:      time.Now(),
 	}
@@ -155,8 +157,10 @@ func mapStatus(s string) string {
 
 // --- Condition mapping ---
 
-// mapCondition converts Japanese condition strings to domain condition constants.
+// mapCondition converts condition strings (Japanese and English) to domain
+// condition constants. English values are matched case-insensitively.
 func mapCondition(s string) string {
+	// Try exact match first for Japanese strings.
 	switch s {
 	case "新品、未使用":
 		return domain.ConditionNew
@@ -167,6 +171,20 @@ func mapCondition(s string) string {
 	case "やや傷や汚れあり":
 		return domain.ConditionFair
 	case "傷や汚れあり", "全体的に状態が悪い":
+		return domain.ConditionPoor
+	}
+
+	// Case-insensitive match for English condition strings.
+	switch strings.ToLower(s) {
+	case "new":
+		return domain.ConditionNew
+	case "like_new":
+		return domain.ConditionLikeNew
+	case "good":
+		return domain.ConditionGood
+	case "fair":
+		return domain.ConditionFair
+	case "poor":
 		return domain.ConditionPoor
 	default:
 		return ""

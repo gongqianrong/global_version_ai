@@ -8,7 +8,14 @@ import (
 
 // RedisSink is a stub Redis output sink. The Write method is a no-op for now
 // and will be wired to a real Redis client in a later task.
-type RedisSink struct{}
+type RedisSink struct {
+	prefix string
+}
+
+// NewRedisSink creates a RedisSink that uses the given key prefix.
+func NewRedisSink(prefix string) *RedisSink {
+	return &RedisSink{prefix: prefix}
+}
 
 // Name returns the sink identifier.
 func (s *RedisSink) Name() string { return "redis" }
