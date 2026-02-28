@@ -2,7 +2,7 @@
 
 > Go 网关对外暴露的骏河屋商品相关 HTTP 接口
 > 基础路径: `http://{GATEWAY_HOST}:{PORT}` (默认端口 8080)
-> 整理时间: 2026-02-27
+> 整理时间: 2026-02-28（更新扩展接口）
 
 ---
 
@@ -13,8 +13,9 @@
 3. [实时搜索流](#3-实时搜索流-websocket)
 4. [商品详情](#4-商品详情)
 5. [健康检查](#5-健康检查)
-6. [骏河屋扩展接口](#6-骏河屋扩展接口待接入)
-7. [数据模型](#7-数据模型)
+6. [平台直搜](#6-平台直搜)
+7. [骏河屋扩展接口](#7-骏河屋扩展接口)
+8. [数据模型](#8-数据模型)
 
 ---
 
@@ -336,22 +337,73 @@ GET /api/v1/products/surugaya_663043159?lang=zh-TW
 
 ---
 
-## 6. 骏河屋扩展接口（待接入）
+## 6. 平台直搜
 
-以下接口已在 Surugaya Adapter `Client()` 中实现，尚未暴露为 HTTP 端点。后续需在 `api/` 层新增 handler 接入。
+### `GET /api/v1/platform/search`
 
-| Go Client 方法 | 上游路径 | 说明 | 建议端点 |
-|----------------|----------|------|----------|
-| `GetProductExtend(goodsID)` | `/suruga/product/extend/{goods_id}` | 评论与相似商品 | `GET /api/v1/products/{id}/extend` |
-| `GetProductStores(goodsID)` | `/suruga/product/extend/store/{goods_id}` | 其他可购商店 | `GET /api/v1/products/{id}/stores` |
-| `GetDiscount()` | `/suruga/product/discount` | 折扣活动信息 | `GET /api/v1/surugaya/discount` |
-| `GetUserComments(params)` | `/suruga/product/user/comments` | 用户评论历史 | `GET /api/v1/surugaya/user/comments` |
-| `GetCampaigns()` | `/suruga/product/campaign` | 活动列表 | `GET /api/v1/surugaya/campaigns` |
-| `GetCampaignDetail(url)` | `/suruga/product/campaign/detail` | 活动详情 | `GET /api/v1/surugaya/campaigns/detail` |
+直接调用平台适配器搜索，跳过 Elasticsearch 缓存层。适合实时获取平台最新数据。
 
-### 扩展接口上游数据结构参考
+### 请求参数 (Query)
 
-#### GetProductExtend — 评论与相似商品
+| 参数 | 必填 | 类型 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| keyword | **是** | string | — | 搜索关键词 |
+| platform | **是** | string | — | 平台 ID: `surugaya` |
+| page | 否 | int | 1 | 页码 |
+| page_size | 否 | int | 20 | 每页条数 |
+| sort | 否 | string | 相关性 | 排序 |
+| condition | 否 | string | — | 品相筛选 |
+| price_min | 否 | int64 | 0 | 最低价格 |
+| price_max | 否 | int64 | 0 | 最高价格 |
+| content_rating | 否 | string | general | 内容分级 |
+
+### 请求示例
+
+```
+GET /api/v1/platform/search?keyword=gundam&platform=surugaya&page=1
+```
+
+### 响应 data
+
+```json
+{
+  "products": [
+    {
+      "id": "surugaya_663043159",
+      "title": "FW GUNDAM CONVERGE SB ニカーヤ",
+      "title_original": "FW GUNDAM CONVERGE SB アーガマ級強襲用宇宙巡洋艦 ニカーヤ",
+      "image": "https://cdn.suruga-ya.jp/pics_webp/boxart_m/663043159m.jpg.webp",
+      "price_jpy": 5445,
+      "platform": "surugaya",
+      "status": "sold",
+      "brand": "[バンダイ]",
+      "is_translated": false
+    }
+  ],
+  "total": 14405,
+  "platform": "surugaya"
+}
+```
+
+---
+
+## 7. 骏河屋扩展接口
+
+### 7.1 商品评论与相似商品
+
+#### `GET /api/v1/surugaya/products/{id}/reviews`
+
+| 参数 | 位置 | 必填 | 说明 |
+|------|------|------|------|
+| id | URL Path | **是** | 骏河屋商品 ID，如 `663043159` |
+
+#### 请求示例
+
+```
+GET /api/v1/surugaya/products/663043159/reviews
+```
+
+#### 响应 data
 
 ```json
 {
@@ -377,7 +429,23 @@ GET /api/v1/products/surugaya_663043159?lang=zh-TW
 }
 ```
 
-#### GetProductStores — 其他可购商店
+---
+
+### 7.2 其他可购店铺
+
+#### `GET /api/v1/surugaya/products/{id}/stores`
+
+| 参数 | 位置 | 必填 | 说明 |
+|------|------|------|------|
+| id | URL Path | **是** | 骏河屋商品 ID |
+
+#### 请求示例
+
+```
+GET /api/v1/surugaya/products/663043159/stores
+```
+
+#### 响应 data
 
 ```json
 {
@@ -403,7 +471,21 @@ GET /api/v1/products/surugaya_663043159?lang=zh-TW
 }
 ```
 
-#### GetDiscount — 折扣活动
+---
+
+### 7.3 折扣活动
+
+#### `GET /api/v1/surugaya/discounts`
+
+无需参数。
+
+#### 请求示例
+
+```
+GET /api/v1/surugaya/discounts
+```
+
+#### 响应 data
 
 ```json
 {
@@ -424,7 +506,57 @@ GET /api/v1/products/surugaya_663043159?lang=zh-TW
 }
 ```
 
-#### GetCampaigns — 活动列表
+---
+
+### 7.4 用户留言历史
+
+#### `GET /api/v1/surugaya/comments`
+
+| 参数 | 位置 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| user_id | Query | **是** | — | 用户 ID |
+| page | Query | 否 | 1 | 页码 |
+| page_size | Query | 否 | 20 | 每页条数 |
+| sort | Query | 否 | -created_at | 排序: `-created_at`, `-rate`, `-useful` |
+
+#### 请求示例
+
+```
+GET /api/v1/surugaya/comments?user_id=user123&page=1&page_size=10
+```
+
+#### 响应 data
+
+```json
+{
+  "comments": [
+    {
+      "comment": "良い商品です",
+      "other": "",
+      "star": "4.0",
+      "userId": "user123",
+      "userName": "ユーザー名"
+    }
+  ],
+  "platform": 0
+}
+```
+
+---
+
+### 7.5 活动列表
+
+#### `GET /api/v1/surugaya/campaigns`
+
+无需参数。
+
+#### 请求示例
+
+```
+GET /api/v1/surugaya/campaigns
+```
+
+#### 响应 data
 
 ```json
 {
@@ -444,7 +576,23 @@ GET /api/v1/products/surugaya_663043159?lang=zh-TW
 }
 ```
 
-#### GetCampaignDetail — 活动详情
+---
+
+### 7.6 活动详情
+
+#### `GET /api/v1/surugaya/campaigns/detail`
+
+| 参数 | 位置 | 必填 | 说明 |
+|------|------|------|------|
+| url | Query | **是** | 活动详情页 URL |
+
+#### 请求示例
+
+```
+GET /api/v1/surugaya/campaigns/detail?url=https://www.suruga-ya.jp/campaign/xxx
+```
+
+#### 响应 data
 
 ```json
 {
@@ -475,7 +623,7 @@ GET /api/v1/products/surugaya_663043159?lang=zh-TW
 
 ---
 
-## 7. 数据模型
+## 8. 数据模型
 
 ### ProductSummary（搜索结果列表项）
 
@@ -576,5 +724,7 @@ GET /api/v1/products/surugaya_663043159?lang=zh-TW
 | `backend/internal/normalizer/normalizer.go` | RawProduct → UnifiedProduct 标准化 |
 | `backend/internal/api/search.go` | 搜索 handler |
 | `backend/internal/api/product.go` | 商品详情 handler |
+| `backend/internal/api/platform_search_handler.go` | 平台直搜 handler |
+| `backend/internal/api/surugaya_handler.go` | 骏河屋扩展接口 handler (6个端点) |
 | `backend/internal/api/realtime.go` | WebSocket 实时流 handler |
 | `backend/internal/api/router.go` | 路由注册 |
