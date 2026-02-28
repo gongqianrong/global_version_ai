@@ -1,0 +1,6 @@
+.git
+*.md
+bin/
+gateway
+Makefile
+scripts/

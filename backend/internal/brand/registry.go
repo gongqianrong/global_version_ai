@@ -115,6 +115,35 @@ func normalizeKey(s string) string {
 	return strings.ToLower(s)
 }
 
+// DefaultRegistry returns a Registry pre-populated with well-known luxury and
+// streetwear brands that match the Python AI service's KNOWN_BRANDS list.
+func DefaultRegistry() *Registry {
+	r := NewRegistry()
+
+	brands := []Entry{
+		{ID: "chanel", NameStd: "Chanel", NameJA: "シャネル", Aliases: []string{"CHANEL"}},
+		{ID: "gucci", NameStd: "Gucci", NameJA: "グッチ", Aliases: []string{"GUCCI"}},
+		{ID: "louis_vuitton", NameStd: "Louis Vuitton", NameJA: "ルイ・ヴィトン", Aliases: []string{"LOUIS VUITTON", "LV"}},
+		{ID: "prada", NameStd: "Prada", NameJA: "プラダ", Aliases: []string{"PRADA"}},
+		{ID: "hermes", NameStd: "Hermes", NameJA: "エルメス", Aliases: []string{"HERMES"}},
+		{ID: "burberry", NameStd: "Burberry", NameJA: "バーバリー", Aliases: []string{"BURBERRY"}},
+		{ID: "coach", NameStd: "Coach", NameJA: "コーチ", Aliases: []string{"COACH"}},
+		{ID: "nike", NameStd: "Nike", NameJA: "ナイキ", Aliases: []string{"NIKE"}},
+		{ID: "adidas", NameStd: "Adidas", NameJA: "アディダス", Aliases: []string{"ADIDAS"}},
+		{ID: "supreme", NameStd: "Supreme", NameJA: "シュプリーム", Aliases: []string{"SUPREME"}},
+		{ID: "balenciaga", NameStd: "Balenciaga", NameJA: "バレンシアガ", Aliases: []string{"BALENCIAGA"}},
+		{ID: "dior", NameStd: "Dior", NameJA: "ディオール", Aliases: []string{"DIOR"}},
+		{ID: "fendi", NameStd: "Fendi", NameJA: "フェンディ", Aliases: []string{"FENDI"}},
+		{ID: "celine", NameStd: "Celine", NameJA: "セリーヌ", Aliases: []string{"CELINE"}},
+	}
+
+	for _, b := range brands {
+		r.Add(b)
+	}
+
+	return r
+}
+
 // isCJK reports whether the string contains any CJK or Japanese characters.
 func isCJK(s string) bool {
 	for _, r := range s {

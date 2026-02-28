@@ -1,0 +1,78 @@
+{
+  "common": {
+    "appName": "Rakutao",
+    "search": "検索",
+    "home": "ホーム",
+    "loading": "読み込み中...",
+    "error": "エラーが発生しました",
+    "noResults": "結果が見つかりません",
+    "retry": "再試行",
+    "back": "戻る"
+  },
+  "search": {
+    "placeholder": "商品名、ブランドで検索...",
+    "allPlatforms": "すべて",
+    "filters": "フィルター",
+    "sort": "並び替え",
+    "relevance": "関連度",
+    "priceLow": "価格の安い順",
+    "priceHigh": "価格の高い順",
+    "newest": "新着順",
+    "results": "{{count}} 件の結果",
+    "streaming": "リアルタイム結果を取得中...",
+    "streamingDone": "すべてのプラットフォーム検索完了",
+    "platformsDone": "{{done}}/{{total}} 完了",
+    "loadMore": "もっと見る",
+    "fee": "手数料込 ¥{{total}}"
+  },
+  "filters": {
+    "platform": "プラットフォーム",
+    "priceRange": "価格帯",
+    "brand": "ブランド",
+    "condition": "商品状態",
+    "priceMin": "最低価格",
+    "priceMax": "最高価格",
+    "apply": "適用",
+    "clear": "クリア",
+    "reset": "リセット"
+  },
+  "product": {
+    "itemPrice": "商品価格",
+    "serviceFee": "手数料(10%)",
+    "total": "合計",
+    "shippingNote": "※国際送料は別途",
+    "buyNow": "今すぐ購入",
+    "placeBid": "入札する",
+    "currentBid": "現在の入札額",
+    "bidders": "{{count}} 人入札",
+    "timeLeft": "残り時間",
+    "seller": "出品者情報",
+    "rating": "評価",
+    "description": "商品説明",
+    "translated": "翻訳版",
+    "original": "日本語原文",
+    "condition": "状態",
+    "platform": "出品元",
+    "brand": "ブランド"
+  },
+  "conditions": {
+    "new": "新品",
+    "like_new": "未使用に近い",
+    "good": "目立った傷なし",
+    "fair": "やや傷あり",
+    "poor": "傷あり"
+  },
+  "home": {
+    "featured": "おすすめ",
+    "categories": "カテゴリー",
+    "searchHint": "日本のお宝を探す...",
+    "cat_figures": "フィギュア",
+    "cat_games": "ゲーム機",
+    "cat_electronics": "電子機器",
+    "cat_anime": "アニメグッズ",
+    "cat_toys": "トイ・ブラインドボックス",
+    "cat_camera": "カメラ",
+    "cat_brands": "ブランド",
+    "cat_more": "もっと見る"
+  }
+}

@@ -51,6 +51,7 @@ type UnifiedProduct struct {
 	DescTranslated  map[string]string `json:"desc_translated,omitempty"`
 	Images          []string          `json:"images"`
 	PriceJPY        int64             `json:"price_jpy"`
+	ServiceFeeJPY   int64             `json:"service_fee_jpy"`
 	OriginalPrice   int64             `json:"original_price"`
 	ShippingType    string            `json:"shipping_type"`
 	ShippingFeeJPY  int64             `json:"shipping_fee_jpy"`

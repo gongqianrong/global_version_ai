@@ -18,18 +18,26 @@ func (m *mockTranslator) Translate(_ context.Context, _, _ string) (string, erro
 	return m.result, m.err
 }
 
+type mockKeywordChecker struct {
+	blocked bool
+}
+
+func (m *mockKeywordChecker) IsBlocked(_ string) bool {
+	return m.blocked
+}
+
 func TestPrepareQuery_EnglishKeyword_Translated(t *testing.T) {
 	translator := &mockTranslator{result: "グッチ バッグ"}
-	gw := NewGateway(translator)
+	gw := NewGateway(translator, nil)
 
 	q := domain.SearchQuery{
 		Keyword:  "gucci bag",
 		UserLang: "en",
 	}
 
-	got, err := gw.prepareQuery(context.Background(), q)
+	got, err := gw.PrepareQuery(context.Background(), q)
 	if err != nil {
-		t.Fatalf("prepareQuery() unexpected error: %v", err)
+		t.Fatalf("PrepareQuery() unexpected error: %v", err)
 	}
 
 	if got.KeywordJA != "グッチ バッグ" {
@@ -39,16 +47,16 @@ func TestPrepareQuery_EnglishKeyword_Translated(t *testing.T) {
 
 func TestPrepareQuery_JapaneseKeyword_PassThrough(t *testing.T) {
 	translator := &mockTranslator{result: "should not be called"}
-	gw := NewGateway(translator)
+	gw := NewGateway(translator, nil)
 
 	q := domain.SearchQuery{
 		Keyword:  "グッチ バッグ",
 		UserLang: "ja",
 	}
 
-	got, err := gw.prepareQuery(context.Background(), q)
+	got, err := gw.PrepareQuery(context.Background(), q)
 	if err != nil {
-		t.Fatalf("prepareQuery() unexpected error: %v", err)
+		t.Fatalf("PrepareQuery() unexpected error: %v", err)
 	}
 
 	if got.KeywordJA != "グッチ バッグ" {
@@ -59,16 +67,16 @@ func TestPrepareQuery_JapaneseKeyword_PassThrough(t *testing.T) {
 func TestPrepareQuery_JapaneseKeyword_AutoDetect(t *testing.T) {
 	// Even without UserLang="ja", Japanese text should be auto-detected.
 	translator := &mockTranslator{result: "should not be called"}
-	gw := NewGateway(translator)
+	gw := NewGateway(translator, nil)
 
 	q := domain.SearchQuery{
 		Keyword:  "グッチ バッグ",
 		UserLang: "en",
 	}
 
-	got, err := gw.prepareQuery(context.Background(), q)
+	got, err := gw.PrepareQuery(context.Background(), q)
 	if err != nil {
-		t.Fatalf("prepareQuery() unexpected error: %v", err)
+		t.Fatalf("PrepareQuery() unexpected error: %v", err)
 	}
 
 	if got.KeywordJA != "グッチ バッグ" {
@@ -78,16 +86,16 @@ func TestPrepareQuery_JapaneseKeyword_AutoDetect(t *testing.T) {
 
 func TestPrepareQuery_TranslationError_FallbackToOriginal(t *testing.T) {
 	translator := &mockTranslator{err: errors.New("translation service unavailable")}
-	gw := NewGateway(translator)
+	gw := NewGateway(translator, nil)
 
 	q := domain.SearchQuery{
 		Keyword:  "gucci bag",
 		UserLang: "en",
 	}
 
-	got, err := gw.prepareQuery(context.Background(), q)
+	got, err := gw.PrepareQuery(context.Background(), q)
 	if err != nil {
-		t.Fatalf("prepareQuery() unexpected error: %v", err)
+		t.Fatalf("PrepareQuery() unexpected error: %v", err)
 	}
 
 	// On translation error, KeywordJA should fall back to the original keyword.
@@ -98,16 +106,16 @@ func TestPrepareQuery_TranslationError_FallbackToOriginal(t *testing.T) {
 
 func TestPrepareQuery_EmptyKeyword(t *testing.T) {
 	translator := &mockTranslator{result: "should not be called"}
-	gw := NewGateway(translator)
+	gw := NewGateway(translator, nil)
 
 	q := domain.SearchQuery{
 		Keyword:  "",
 		UserLang: "en",
 	}
 
-	got, err := gw.prepareQuery(context.Background(), q)
+	got, err := gw.PrepareQuery(context.Background(), q)
 	if err != nil {
-		t.Fatalf("prepareQuery() unexpected error: %v", err)
+		t.Fatalf("PrepareQuery() unexpected error: %v", err)
 	}
 
 	if got.KeywordJA != "" {
@@ -117,16 +125,16 @@ func TestPrepareQuery_EmptyKeyword(t *testing.T) {
 
 func TestPrepareQuery_HiraganaKeyword(t *testing.T) {
 	translator := &mockTranslator{result: "should not be called"}
-	gw := NewGateway(translator)
+	gw := NewGateway(translator, nil)
 
 	q := domain.SearchQuery{
 		Keyword:  "ぐっち",
 		UserLang: "ja",
 	}
 
-	got, err := gw.prepareQuery(context.Background(), q)
+	got, err := gw.PrepareQuery(context.Background(), q)
 	if err != nil {
-		t.Fatalf("prepareQuery() unexpected error: %v", err)
+		t.Fatalf("PrepareQuery() unexpected error: %v", err)
 	}
 
 	if got.KeywordJA != "ぐっち" {
@@ -157,5 +165,74 @@ func TestIsJapanese(t *testing.T) {
 				t.Errorf("isJapanese(%q) = %v, want %v", tt.s, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestPrepareQuery_BlockedKeyword(t *testing.T) {
+	translator := &mockTranslator{result: "should not be called"}
+	checker := &mockKeywordChecker{blocked: true}
+	gw := NewGateway(translator, checker)
+
+	q := domain.SearchQuery{
+		Keyword:  "blocked_term",
+		UserLang: "en",
+	}
+
+	_, err := gw.PrepareQuery(context.Background(), q)
+	if err != ErrBlockedKeyword {
+		t.Errorf("expected ErrBlockedKeyword, got %v", err)
+	}
+}
+
+func TestPrepareQuery_AllowedKeyword(t *testing.T) {
+	translator := &mockTranslator{result: "翻訳結果"}
+	checker := &mockKeywordChecker{blocked: false}
+	gw := NewGateway(translator, checker)
+
+	q := domain.SearchQuery{
+		Keyword:  "safe_term",
+		UserLang: "en",
+	}
+
+	got, err := gw.PrepareQuery(context.Background(), q)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.KeywordJA != "翻訳結果" {
+		t.Errorf("KeywordJA = %q, want %q", got.KeywordJA, "翻訳結果")
+	}
+}
+
+func TestPrepareQuery_NilKeywordChecker(t *testing.T) {
+	translator := &mockTranslator{result: "翻訳結果"}
+	gw := NewGateway(translator, nil)
+
+	q := domain.SearchQuery{
+		Keyword:  "any_keyword",
+		UserLang: "en",
+	}
+
+	got, err := gw.PrepareQuery(context.Background(), q)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.KeywordJA != "翻訳結果" {
+		t.Errorf("KeywordJA = %q, want %q", got.KeywordJA, "翻訳結果")
+	}
+}
+
+func TestPrepareQuery_EmptyKeyword_SkipsChecker(t *testing.T) {
+	translator := &mockTranslator{result: "should not be called"}
+	checker := &mockKeywordChecker{blocked: true}
+	gw := NewGateway(translator, checker)
+
+	q := domain.SearchQuery{
+		Keyword:  "",
+		UserLang: "en",
+	}
+
+	_, err := gw.PrepareQuery(context.Background(), q)
+	if err != nil {
+		t.Fatalf("expected no error for empty keyword, got %v", err)
 	}
 }

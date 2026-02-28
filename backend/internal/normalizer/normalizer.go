@@ -53,14 +53,30 @@ func (n *Normalizer) Normalize(platform string, raw domain.RawProduct) (*domain.
 	statusStr := extractString(raw.RawData, "status")
 	conditionStr := extractString(raw.RawData, "condition")
 
+	// Optional fields provided by platform adapters.
+	sourceURL := extractString(raw.RawData, "source_url")
+	contentRating := extractString(raw.RawData, "content_rating")
+	sellerID := extractString(raw.RawData, "seller_id")
+	sellerName := extractString(raw.RawData, "seller_name")
+	subcategory := extractString(raw.RawData, "subcategory")
+	janCode := extractString(raw.RawData, "jan_code")
+	manufacturer := extractString(raw.RawData, "manufacturer")
+
+	basePriceJPY := int64(price)
+	serviceFeeJPY := basePriceJPY * 10 / 100
+	finalPriceJPY := basePriceJPY + serviceFeeJPY
+
 	product := &domain.UnifiedProduct{
 		ID:             domain.NewProductID(platform, raw.RawID),
 		SourcePlatform: platform,
 		SourceID:       raw.RawID,
+		SourceURL:      sourceURL,
 		Title:          title,
 		Description:    description,
 		Images:         images,
-		PriceJPY:       int64(price),
+		PriceJPY:       finalPriceJPY,
+		ServiceFeeJPY:  serviceFeeJPY,
+		OriginalPrice:  basePriceJPY,
 		SourceCategory: category,
 		Status:         mapStatus(statusStr),
 		Condition:      mapCondition(conditionStr),
@@ -70,8 +86,43 @@ func (n *Normalizer) Normalize(platform string, raw domain.RawProduct) (*domain.
 		UpdatedAt:      time.Now(),
 	}
 
-	// Call brand extractor if available.
-	if n.brandExtractor != nil {
+	// Override content rating if adapter provides it.
+	if contentRating == domain.ContentRatingR18 {
+		product.ContentRating = domain.ContentRatingR18
+	}
+
+	// Set seller info if adapter provides it.
+	if sellerID != "" {
+		product.Seller = domain.SellerInfo{
+			SellerID:   sellerID,
+			SellerName: sellerName,
+		}
+	}
+
+	// Build tags from optional metadata fields.
+	var tags []string
+	if subcategory != "" {
+		tags = append(tags, subcategory)
+	}
+	if manufacturer != "" {
+		tags = append(tags, manufacturer)
+	}
+	if janCode != "" {
+		tags = append(tags, "JAN:"+janCode)
+	}
+	product.Tags = tags
+
+	// If a brand_name is directly provided by the adapter, use it.
+	brandName := extractString(raw.RawData, "brand_name")
+	if brandName != "" {
+		product.Brand = &domain.Brand{
+			Name:   brandName,
+			Source: "platform_field",
+		}
+	}
+
+	// Call brand extractor if available and no brand set yet.
+	if product.Brand == nil && n.brandExtractor != nil {
 		brand, err := n.brandExtractor.Extract(title, description, category)
 		if err == nil && brand != nil {
 			product.Brand = brand
@@ -144,7 +195,7 @@ func mapStatus(s string) string {
 	switch strings.ToLower(s) {
 	case "on_sale", "available", "active":
 		return domain.StatusAvailable
-	case "sold", "sold_out":
+	case "sold", "sold_out", "品切れ":
 		return domain.StatusSold
 	case "reserved", "trading":
 		return domain.StatusReserved
@@ -160,7 +211,7 @@ func mapStatus(s string) string {
 // mapCondition converts condition strings (Japanese and English) to domain
 // condition constants. English values are matched case-insensitively.
 func mapCondition(s string) string {
-	// Try exact match first for Japanese strings.
+	// Try exact match first for Japanese strings (Mercari/Yahoo style).
 	switch s {
 	case "新品、未使用":
 		return domain.ConditionNew
@@ -171,6 +222,24 @@ func mapCondition(s string) string {
 	case "やや傷や汚れあり":
 		return domain.ConditionFair
 	case "傷や汚れあり", "全体的に状態が悪い":
+		return domain.ConditionPoor
+	}
+
+	// Surugaya condition grades.
+	switch s {
+	case "新品":
+		return domain.ConditionNew
+	case "A+":
+		return domain.ConditionLikeNew
+	case "A":
+		return domain.ConditionGood
+	case "B+":
+		return domain.ConditionGood
+	case "B":
+		return domain.ConditionFair
+	case "C":
+		return domain.ConditionPoor
+	case "ジャンク":
 		return domain.ConditionPoor
 	}
 

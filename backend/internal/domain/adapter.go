@@ -1,6 +1,12 @@
 package domain
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+// ErrAdapterNotFound is returned when a platform adapter is not registered.
+var ErrAdapterNotFound = errors.New("domain: adapter not found")
 
 // AdapterCaps declares the capabilities of a platform adapter, allowing the
 // gateway to decide how to route searches and collection jobs.
@@ -51,7 +57,8 @@ type SearchResult struct {
 // PlatformAdapter is the interface every marketplace platform must implement
 // in order to be plugged into the collection gateway.
 type PlatformAdapter interface {
-	// PlatformID returns the unique identifier for this platform (e.g. "mercari").
+	// PlatformID returns the unique identifier for this platform
+	// (e.g. "yahoo_auction", "amazon_jp", "surugaya", "animate", "lashinbang").
 	PlatformID() string
 
 	// Capabilities returns the declared capabilities of this adapter.

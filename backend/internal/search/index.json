@@ -32,6 +32,8 @@
       "condition": {"type": "keyword"},
       "content_rating": {"type": "keyword"},
       "price_jpy": {"type": "long"},
+      "service_fee_jpy": {"type": "long"},
+      "original_price": {"type": "long"},
       "shipping_type": {"type": "keyword"},
       "seller_id": {"type": "keyword"},
       "seller_rating": {"type": "float"},

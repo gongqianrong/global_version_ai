@@ -118,6 +118,7 @@ func TestUnifiedProductStructFields(t *testing.T) {
 		DescTranslated:  map[string]string{"en": "A nice bag"},
 		Images:          []string{"img1.jpg", "img2.jpg"},
 		PriceJPY:        15000,
+		ServiceFeeJPY:   1500,
 		OriginalPrice:   18000,
 		ShippingType:    ShippingFree,
 		ShippingFeeJPY:  0,
@@ -146,6 +147,9 @@ func TestUnifiedProductStructFields(t *testing.T) {
 	}
 	if p.PriceJPY != 15000 {
 		t.Errorf("PriceJPY = %d, want %d", p.PriceJPY, 15000)
+	}
+	if p.ServiceFeeJPY != 1500 {
+		t.Errorf("ServiceFeeJPY = %d, want %d", p.ServiceFeeJPY, 1500)
 	}
 	if p.Brand.Name != "Gucci" {
 		t.Errorf("Brand.Name = %q, want %q", p.Brand.Name, "Gucci")

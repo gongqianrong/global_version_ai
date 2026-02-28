@@ -57,6 +57,7 @@ type ProductSummary struct {
 	Platform      string   `json:"platform"`
 	Status        string   `json:"status"`
 	Brand         string   `json:"brand,omitempty"`
+	Condition     string   `json:"condition,omitempty"`
 	Tags          []string `json:"tags,omitempty"`
 	IsTranslated  bool     `json:"is_translated"`
 }

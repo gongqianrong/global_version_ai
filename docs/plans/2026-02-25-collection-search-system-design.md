@@ -1,9 +1,13 @@
 # Rakutao International - 采集与搜索系统设计文档
 
-> **Version**: 1.0
+> **Version**: 1.1
 > **Date**: 2026-02-25
 > **Status**: Approved
 > **Related**: [Project Brief](../project-brief.md) | [PRD](../prd.md) | [Architecture](../architecture.md)
+>
+> **Changelog**:
+> - v1.1 (2026-02-25): 同步 PRD Rev.4 变更 — 第一期平台（雅虎日拍/亚马逊/骏河屋/Animate/罗针盘）、支付方式（钱包+微信+支付宝）、默认语言（繁体中文）、内容分级策略（开放成人类、屏蔽涉政类）、定价策略（10%手续费、日元含税价）、物流策略（默认邮政）、仓储策略（统一管理）、中国大陆排除策略
+> - v1.0 (2026-02-25): 初版设计文档
 
 ---
 
@@ -28,12 +32,36 @@
 | 品牌库 | **PostgreSQL** | 结构化品牌数据、别名映射 |
 | Go ↔ Python 通信 | **gRPC / HTTP** | Python 作为独立微服务被 Go 调用 |
 
-### 1.2 设计原则
+### 1.2 第一期平台范围
+
+> 基于 PRD Rev.4，第一期平台如下（后续扩展 Mercari、Rakuma、TOBU 等）：
+
+| 平台 | 英文 | 类型 | 说明 |
+|------|------|------|------|
+| 雅虎日拍 | Yahoo Auctions Japan | 拍卖 + 一口价 | 日本最大拍卖平台 |
+| 亚马逊日本 | Amazon Japan | B2C 电商 | 有开放 API (PA-API) |
+| 骏河屋 | Suruga-ya | 二手/中古 | 动漫、游戏、书籍、玩具等 |
+| Animate | Animate | 动漫周边专卖 | 官方动漫周边 |
+| 罗针盘 | Lashinbang | 二手动漫周边 | 中古动漫商品 |
+
+### 1.3 定价与费用策略
+
+| 策略 | 说明 |
+|------|------|
+| **价格展示** | 所有商品价格以日元含税价（税込価格）展示 |
+| **代购手续费** | 统一 10%，含在展示价格中 |
+| **附加服务** | 打包费、鉴定费等同样按日元含税价显示 |
+| **费用承担** | 消费税、支付手续费等由客户承担 |
+
+### 1.4 设计原则
 
 - **统一网关**：上层服务只与统一 Schema 交互，平台差异在 Adapter 层内部消化
 - **能力声明**：每个平台通过 Capabilities 声明自身能力，上层逻辑据此决策
 - **渐进增强**：缓存优先快速返回，实时搜索异步补充
-- **WMS/运单预留**：Output Router 使用接口模式，预留未来 WMS 集成扩展点
+- **WMS/运单预留**：Output Router 使用接口模式，预留未来 WMS 集成扩展点；仓储系统国内版与国际版统一管理
+- **中国大陆排除**：收件地址校验排除大陆，搜索层涉政关键词屏蔽
+- **物流默认邮政**：默认邮政物流，后续根据大数据分析推荐更优线路
+- **内容分级**：开放成人类商品，保持涉政类屏蔽
 
 ---
 
@@ -46,7 +74,7 @@
 type UnifiedProduct struct {
     // === 标识 ===
     ID              string    // Rakutao 内部唯一 ID (生成规则: {platform}_{original_id})
-    SourcePlatform  string    // 来源平台标识: "mercari", "rakuma", "tobu", "beams" ...
+    SourcePlatform  string    // 来源平台标识: "yahoo_auction", "amazon_jp", "surugaya", "animate", "lashinbang" ...
     SourceID        string    // 源平台原始商品 ID
     SourceURL       string    // 源平台原始链接 (内部使用，不暴露给用户)
 
@@ -57,11 +85,12 @@ type UnifiedProduct struct {
     DescTranslated  map[string]string   // 翻译后描述
     Images          []string            // 图片 URL 列表 (第一张为主图)
 
-    // === 价格 ===
-    PriceJPY        int64     // 价格 (日元，整数)
-    OriginalPrice   int64     // 原价 (有折扣时)
+    // === 价格 (所有价格均为日元含税价) ===
+    PriceJPY        int64     // 商品价格 (日元含税价，含 10% 代购手续费)
+    OriginalPrice   int64     // 原价 (有折扣时，日元含税价)
+    ServiceFeeJPY   int64     // 代购手续费 (10%，已含在 PriceJPY 中，此处为明细拆分)
     ShippingType    string    // "free" | "buyer_pays" | "included"
-    ShippingFeeJPY  int64     // 国内运费 (日元)
+    ShippingFeeJPY  int64     // 国内运费 (日元含税价)
 
     // === 分类与品牌 ===
     Brand           *Brand    // 品牌信息 (可为空)
@@ -87,7 +116,7 @@ type UnifiedProduct struct {
     CacheTTL        int       // 缓存有效期 (秒)
 
     // === 内容分级 (v2) ===
-    ContentRating   string    // "general" | "r18"
+    ContentRating   string    // "general" | "r18" (成人类已开放，涉政类屏蔽)
 
     // === 物流预留 (WMS 需求明确后扩展) ===
     Logistics       *LogisticsInfo
@@ -126,7 +155,8 @@ type LogisticsInfo struct {
 | 决策 | 理由 |
 |------|------|
 | `ID` 使用 `{platform}_{original_id}` | 全局唯一，且可反查来源 |
-| 价格用 `int64` 而非 `float` | 日元无小数，避免浮点精度问题 |
+| 价格用 `int64` 而非 `float` | 日元无小数，避免浮点精度问题。所有价格为含税价 |
+| 新增 `ServiceFeeJPY` 字段 | 10% 代购手续费已含在 PriceJPY 中，此字段用于费用明细拆分展示 |
 | 翻译字段用 `map[string]string` | 灵活支持多语言，按需翻译 |
 | `Brand` 独立结构体 + 可为空 | 不是所有商品都有品牌，品牌需要指向统一品牌库 |
 | 保留 `SourceCategory` | 方便调试分类映射的准确性 |
@@ -153,13 +183,12 @@ type LogisticsInfo struct {
 │         ▼                    ▼                    ▼             │
 │  ┌──────────────┐  ┌──────────────────┐  ┌──────────────────┐  │
 │  │ Adapter 类型A │  │  Adapter 类型B    │  │  Adapter 类型C    │  │
-│  │ 国内版代理    │  │  自有爬虫 (Python) │  │  自有API对接 (Go) │  │
-│  │              │  │                  │  │                  │  │
-│  │ · Mercari    │  │ · 新平台X        │  │ · 新平台Y         │  │
-│  │ · Rakuma     │  │ · 新平台Z        │  │ · (有开放API的)    │  │
-│  │ · TOBU       │  │                  │  │                  │  │
-│  │ · netsea     │  │                  │  │                  │  │
-│  │ · BEAMS ...  │  │                  │  │                  │  │
+│  │ 自有爬虫(Py)  │  │  自有API对接(Go)  │  │  国内版代理       │  │
+│  │              │  │                  │  │  (后续扩展)       │  │
+│  │ · 雅虎日拍   │  │ · 亚马逊日本     │  │ · Mercari        │  │
+│  │ · 骏河屋     │  │   (PA-API)       │  │ · Rakuma         │  │
+│  │ · Animate    │  │                  │  │ · TOBU ...       │  │
+│  │ · 罗针盘     │  │                  │  │                  │  │
 │  └──────────────┘  └──────────────────┘  └──────────────────┘  │
 │         │                    │                    │             │
 │         ▼                    ▼                    ▼             │
@@ -189,7 +218,7 @@ type LogisticsInfo struct {
 
 type PlatformAdapter interface {
     // 平台标识
-    PlatformID() string        // "mercari", "rakuma", "tobu" ...
+    PlatformID() string        // "yahoo_auction", "amazon_jp", "surugaya", "animate", "lashinbang" ...
 
     // 能力声明 — 不同平台能力不同
     Capabilities() AdapterCaps
@@ -234,19 +263,22 @@ type OutputSink interface {
 
 ### 3.3 三类 Adapter 实现模式
 
-**类型 A — 国内版代理 Adapter：**
-- 调用国内版已有的采集接口
+**类型 A — 自有爬虫 Adapter（Python）— 第一期主力：**
+- Go 通过 gRPC/HTTP 调用 Python Scrapy 爬虫服务
+- 第一期覆盖：雅虎日拍、骏河屋、Animate、罗针盘
+- Python 端负责反爬对抗、页面解析
+- 需注意各平台商品必须为日本海关允许针对个人出口的商品
+
+**类型 B — 自有 API 对接 Adapter（Go）— 第一期：**
+- 直接用 Go 对接有开放 API 的平台
+- 第一期覆盖：亚马逊日本（PA-API v5）
+- 按平台 API 文档实现
+
+**类型 C — 国内版代理 Adapter（后续扩展）：**
+- 调用国内版已有的采集接口（Mercari、Rakuma、TOBU 等）
 - 拿到各平台的原始数据
 - 包装为 RawProduct 返回，标准化交给 Normalizer
-
-**类型 B — 自有爬虫 Adapter（Python）：**
-- Go 通过 gRPC/HTTP 调用 Python Scrapy 爬虫服务
-- 用于国内版未覆盖的新平台
-- Python 端负责反爬对抗、页面解析
-
-**类型 C — 自有 API 对接 Adapter（Go）：**
-- 直接用 Go 对接有开放 API 的新平台
-- 按平台 API 文档实现
+- 在第二期（v2.1）接入
 
 ### 3.4 Platform Registry（平台注册中心）
 
@@ -256,9 +288,9 @@ type PlatformRegistry struct {
 }
 
 type PlatformMeta struct {
-    ID          string       // "mercari"
-    Name        string       // "メルカリ"
-    NameEN      string       // "Mercari"
+    ID          string       // "yahoo_auction", "amazon_jp", "surugaya", "animate", "lashinbang"
+    Name        string       // "ヤフオク!", "Amazon.co.jp", "駿河屋", "アニメイト", "らしんばん"
+    NameEN      string       // "Yahoo Auctions", "Amazon Japan", "Suruga-ya", "Animate", "Lashinbang"
     Icon        string       // 平台 icon URL (用于前端 UI 标识)
     Type        string       // "domestic_proxy" | "self_crawler" | "self_api"
     Status      string       // "active" | "degraded" | "offline"
@@ -272,11 +304,14 @@ func (r *PlatformRegistry) GetAdapter(platformID string) (PlatformAdapter, error
 
 ### 3.5 WMS / 运单预留设计
 
+> **仓储策略**：仓储系统不分家，国内版与国际版统一管理、统一使用同一仓储系统（WMS）。
+
 Output Router 使用 `OutputSink` 接口，WMS 需求明确后只需实现一个新的 Sink：
 
 ```go
+// 仓储系统统一管理（国内版 + 国际版共用）
 // 场景1: 独立 WMS 系统 → 通过 API/MQ 推送数据
-// 场景2: 国际版专属 WMS → 直接写同一数据库
+// 场景2: 统一 WMS → 直接写同一数据库
 // 具体实现取决于 WMS 架构决策
 type WMSSink struct {
     endpoint string
@@ -429,8 +464,9 @@ type SearchQuery struct {
     SortBy        string   // "relevance" | "price_asc" | "price_desc" | "newest"
     Page          int
     PageSize      int
-    UserLang      string   // 用户语言 "en" | "zh-TW" | "ja"
-    ContentRating string   // "general" | "all" (需年龄验证)
+    UserLang      string   // 用户语言 "zh-TW" (默认) | "ja" | "en"
+    ContentRating string   // "general" | "all" (需年龄验证，成人类已开放)
+    // 注意: 搜索层需过滤涉政类关键词 (黑名单)，成人类关键词已不再屏蔽
 }
 
 // === 搜索响应 ===
@@ -500,10 +536,11 @@ type SearchAggs struct {
     └─ WebSocket: 开启实时代理搜索流
          │
          ├─ 并发调用各活跃平台 Adapter.Search()
-         │   ├─ Mercari adapter → ~2s 返回
-         │   ├─ Rakuma adapter  → ~1.5s 返回
-         │   ├─ TOBU adapter    → ~3s 返回 (超时跳过)
-         │   └─ ...
+         │   ├─ Yahoo Auction adapter → ~2s 返回
+         │   ├─ Amazon JP adapter     → ~1.5s 返回
+         │   ├─ Suruga-ya adapter     → ~2s 返回
+         │   ├─ Animate adapter       → ~3s 返回 (超时跳过)
+         │   └─ Lashinbang adapter    → ~2s 返回
          │
          ├─ 每个平台返回后立即：
          │   ├─ Normalize → UnifiedProduct
@@ -637,7 +674,7 @@ type BrandExtractionResult struct {
                  ┌──────────────▼───────────────────────────────┐
                  │      Collection Gateway (Go)                 │
                  │  ├─ Platform Registry (平台注册中心)           │
-                 │  ├─ Adapters (A:国内版 / B:爬虫 / C:API)      │
+                 │  ├─ Adapters (A:爬虫 / B:API / C:国内版代理)  │
                  │  ├─ Normalizer (标准化 + 品牌提取)             │
                  │  └─ Output Router                            │
                  │      ├─→ Elasticsearch                       │
@@ -648,16 +685,104 @@ type BrandExtractionResult struct {
               ┌─────────────────┼─────────────────┐
               ▼                 ▼                  ▼
      ┌──────────────┐  ┌──────────────┐   ┌──────────────┐
-     │ 国内版采集接口 │  │ Python AI    │   │ 新平台       │
-     │ (已有平台)    │  │ · 品牌提取    │   │ (爬虫/API)   │
-     │              │  │ · 翻译服务    │   │              │
-     │              │  │ · 新平台爬虫   │   │              │
+     │ 第一期平台    │  │ Python AI    │   │ 后续扩展     │
+     │ · 雅虎日拍    │  │ · 品牌提取    │   │ · Mercari    │
+     │ · 亚马逊日本  │  │ · 翻译服务    │   │ · Rakuma     │
+     │ · 骏河屋      │  │ · 平台爬虫    │   │ · TOBU ...   │
+     │ · Animate    │  │              │   │ (国内版代理)  │
+     │ · 罗针盘     │  │              │   │              │
      └──────────────┘  └──────────────┘   └──────────────┘
 ```
 
 ---
 
-## 7. 关键设计决策汇总 (ADR)
+## 7. 内容过滤与关键词管控
+
+### 7.1 关键词黑名单系统
+
+```
+用户搜索关键词
+    │
+    ▼
+┌────────────────────────────────────────┐
+│         Keyword Filter (Go)             │
+│                                        │
+│  1. 涉政关键词黑名单检查                 │
+│     ├─ 命中 → 返回"搜索词不可用"提示     │
+│     └─ 未命中 → 继续                    │
+│                                        │
+│  2. 成人类关键词 → 不再屏蔽 (已开放)     │
+│     └─ 直接通过                         │
+│                                        │
+│  3. 传递给 Search Gateway 正常搜索       │
+└────────────────────────────────────────┘
+```
+
+### 7.2 分类管控
+
+| 分类类型 | 策略 |
+|---------|------|
+| **涉政类分类** | 保持屏蔽，采集时过滤，不入 ES 索引 |
+| **成人类分类** | 已开放，正常采集和索引，通过 ContentRating 字段标记 |
+| **其他被屏蔽分类** | 基于现有自助代购子站分类，开放大部分 |
+
+### 7.3 涉政关键词黑名单维护
+
+```go
+type KeywordFilter struct {
+    politicalBlacklist map[string]bool // 涉政关键词集合（精确匹配 + 包含匹配）
+}
+
+func (f *KeywordFilter) Check(keyword string) (blocked bool, reason string)
+func (f *KeywordFilter) LoadBlacklist(source io.Reader) error
+```
+
+- 黑名单存储在 Redis/数据库中，支持运营后台动态更新
+- 搜索、采集、展示三层都需要进行关键词过滤
+- 涉政商品在采集阶段即过滤，不入库不索引
+
+---
+
+## 8. 地址与地区管控
+
+### 8.1 收件地址校验
+
+```go
+type AddressValidator struct {
+    blockedCountries []string // ["CN"] — 中国大陆
+}
+
+func (v *AddressValidator) Validate(address ShippingAddress) error
+```
+
+- 国家/地区选择器中不包含"中国大陆"选项
+- 后端校验收件地址的国家代码，拒绝 CN 地区
+- 地址校验同时应用于下单和地址管理
+
+### 8.2 中国大陆排除清单
+
+| 排除项 | 实现层 |
+|--------|-------|
+| 应用商店 | 仅上架海外 App Store / Google Play |
+| 手机号注册 | 注册接口校验手机号国家码，拒绝 +86 |
+| 收件地址 | 地址校验拒绝 CN 地区 |
+| IP 访问 | API Gateway 层 GeoIP 拦截大陆 IP |
+| 测试 | 需使用海外苹果/Google 账号 |
+
+---
+
+## 9. 物流策略
+
+| 策略 | 说明 |
+|------|------|
+| **默认物流** | 邮政（EMS / 航空小包等） |
+| **物流选择** | 第一期仅提供邮政，不提供多物流选择 |
+| **后续优化** | 根据大数据分析（目的地、重量、时效偏好），推荐更优更便宜的物流线路 |
+| **运费计算** | 打包完成后按实际重量/体积 + 目的地国家计算，以日元含税价展示 |
+
+---
+
+## 10. 关键设计决策汇总 (ADR)
 
 | # | 决策 | 理由 |
 |---|------|------|
@@ -666,6 +791,11 @@ type BrandExtractionResult struct {
 | ADR-B03 | 能力声明（Capabilities） | 不同平台能力不同，上层逻辑据此决策 |
 | ADR-B04 | 缓存优先 + 实时补充的混合搜索 | 兼顾响应速度和数据新鲜度 |
 | ADR-B05 | 品牌三级识别流水线 | 成本从低到高逐级尝试，命中即停 |
-| ADR-B06 | Output Router 接口模式 | 预留 WMS/运单系统扩展点 |
+| ADR-B06 | Output Router 接口模式 | 预留 WMS/运单系统扩展点；仓储系统国内版国际版统一管理 |
 | ADR-B07 | 品牌名走品牌库映射而非通用翻译 | 保证品牌搜索准确性 |
 | ADR-B08 | 保留 RawData 原始数据 | 标准化失败时不丢数据，支持调试回溯 |
+| ADR-B09 | 第一期聚焦 5 平台 | 雅虎日拍/亚马逊/骏河屋/Animate/罗针盘，覆盖拍卖+B2C+二手+动漫品类 |
+| ADR-B10 | 涉政屏蔽 + 成人开放 | 涉政类关键词和分类保持屏蔽，成人类全面开放（需年龄验证） |
+| ADR-B11 | 所有价格日元含税价 | 统一定价标准，10% 代购手续费含在展示价中 |
+| ADR-B12 | 默认邮政物流 | 第一期简化物流选择，后续大数据优化 |
+| ADR-B13 | 默认繁体中文 | 面向主力市场（台湾、东南亚华人），降低首次使用门槛 |

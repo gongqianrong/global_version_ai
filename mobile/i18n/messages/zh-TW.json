@@ -1,0 +1,78 @@
+{
+  "common": {
+    "appName": "Rakutao",
+    "search": "搜尋",
+    "home": "首頁",
+    "loading": "載入中...",
+    "error": "發生錯誤",
+    "noResults": "沒有找到結果",
+    "retry": "重試",
+    "back": "返回"
+  },
+  "search": {
+    "placeholder": "搜尋商品名稱、品牌...",
+    "allPlatforms": "全部平台",
+    "filters": "篩選",
+    "sort": "排序",
+    "relevance": "相關度",
+    "priceLow": "價格低到高",
+    "priceHigh": "價格高到低",
+    "newest": "最新",
+    "results": "{{count}} 個結果",
+    "streaming": "正在取得即時結果...",
+    "streamingDone": "所有平台搜尋完成",
+    "platformsDone": "{{done}}/{{total}} 個平台完成",
+    "loadMore": "載入更多",
+    "fee": "含手續費 ¥{{total}}"
+  },
+  "filters": {
+    "platform": "平台來源",
+    "priceRange": "價格區間",
+    "brand": "品牌",
+    "condition": "商品狀態",
+    "priceMin": "最低價",
+    "priceMax": "最高價",
+    "apply": "套用",
+    "clear": "清除全部",
+    "reset": "重置"
+  },
+  "product": {
+    "itemPrice": "商品價格",
+    "serviceFee": "手續費(10%)",
+    "total": "合計",
+    "shippingNote": "※國際運費另計",
+    "buyNow": "立即購買",
+    "placeBid": "出價競拍",
+    "currentBid": "目前出價",
+    "bidders": "{{count}} 人出價",
+    "timeLeft": "剩餘時間",
+    "seller": "賣家資訊",
+    "rating": "評價",
+    "description": "商品描述",
+    "translated": "翻譯版",
+    "original": "日文原文",
+    "condition": "狀態",
+    "platform": "來源平台",
+    "brand": "品牌"
+  },
+  "conditions": {
+    "new": "全新",
+    "like_new": "近全新",
+    "good": "良好",
+    "fair": "尚可",
+    "poor": "較差"
+  },
+  "home": {
+    "featured": "精選推薦",
+    "categories": "商品分類",
+    "searchHint": "搜尋日本好物...",
+    "cat_figures": "模型手辦",
+    "cat_games": "遊戲主機",
+    "cat_electronics": "電子產品",
+    "cat_anime": "動漫周邊",
+    "cat_toys": "潮玩盲盒",
+    "cat_camera": "相機攝影",
+    "cat_brands": "品牌精選",
+    "cat_more": "更多分類"
+  }
+}

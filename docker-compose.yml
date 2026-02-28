@@ -4,25 +4,36 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - elasticsearch
-      - redis
-      - postgres
-      - ai-service
+      elasticsearch:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
     environment:
-      - ES_URL=http://elasticsearch:9200
-      - REDIS_URL=redis://redis:6379
-      - POSTGRES_URL=postgres://rakutao:rakutao@postgres:5432/rakutao?sslmode=disable
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - ES_INDEX_NAME=rakutao_products
       - AI_SERVICE_URL=http://ai-service:8000
+      - SURUGAYA_API_URL=http://153.231.197.185
+      - YAHOO_AUCTION_API_URL=http://yahoo-proxy:3001
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   ai-service:
     build: ./ai-service
     ports:
       - "8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
-    command: >
-      bash -c "elasticsearch-plugin install --batch analysis-kuromoji analysis-icu || true && /usr/local/bin/docker-entrypoint.sh elasticsearch"
+    build: ./elasticsearch
     ports:
       - "9200:9200"
     environment:
@@ -31,11 +42,44 @@ services:
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     volumes:
       - es-data:/usr/share/elasticsearch/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  es-init:
+    image: curlimages/curl:latest
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - ./backend/internal/search/index.json:/index.json:ro
+    restart: "no"
+    entrypoint:
+      - sh
+      - -c
+      - |
+        echo "Checking if index exists..."
+        CODE=$$(curl -s -o /dev/null -w "%{http_code}" http://elasticsearch:9200/rakutao_products)
+        if [ "$$CODE" = "200" ]; then
+          echo "Index rakutao_products already exists, skipping."
+          exit 0
+        fi
+        echo "Creating index rakutao_products..."
+        curl -sf -X PUT http://elasticsearch:9200/rakutao_products \
+          -H "Content-Type: application/json" \
+          -d @/index.json
+        echo ""
+        echo "Index created successfully."
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    restart: unless-stopped
 
   postgres:
     image: postgres:16-alpine
@@ -47,6 +91,7 @@ services:
       - POSTGRES_DB=rakutao
     volumes:
       - pg-data:/var/lib/postgresql/data
+    restart: unless-stopped
 
 volumes:
   es-data:

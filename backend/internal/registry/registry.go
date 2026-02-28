@@ -90,6 +90,18 @@ func (r *Registry) ActivePlatforms() []PlatformMeta {
 	return out
 }
 
+// AllPlatformIDs returns the IDs of all registered platforms.
+func (r *Registry) AllPlatformIDs() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	ids := make([]string, 0, len(r.entries))
+	for id := range r.entries {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
 // RealtimeSearchable returns metadata for every registered platform that is
 // active AND whose capabilities indicate realtime search support.
 func (r *Registry) RealtimeSearchable() []PlatformMeta {

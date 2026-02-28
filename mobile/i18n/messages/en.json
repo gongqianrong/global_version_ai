@@ -1,0 +1,78 @@
+{
+  "common": {
+    "appName": "Rakutao",
+    "search": "Search",
+    "home": "Home",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "noResults": "No results found",
+    "retry": "Retry",
+    "back": "Back"
+  },
+  "search": {
+    "placeholder": "Search products, brands...",
+    "allPlatforms": "All Platforms",
+    "filters": "Filters",
+    "sort": "Sort",
+    "relevance": "Relevance",
+    "priceLow": "Price: Low to High",
+    "priceHigh": "Price: High to Low",
+    "newest": "Newest",
+    "results": "{{count}} results",
+    "streaming": "Fetching live results...",
+    "streamingDone": "All platforms done",
+    "platformsDone": "{{done}}/{{total}} done",
+    "loadMore": "Load More",
+    "fee": "w/ fee ¥{{total}}"
+  },
+  "filters": {
+    "platform": "Platform",
+    "priceRange": "Price Range",
+    "brand": "Brand",
+    "condition": "Condition",
+    "priceMin": "Min Price",
+    "priceMax": "Max Price",
+    "apply": "Apply",
+    "clear": "Clear All",
+    "reset": "Reset"
+  },
+  "product": {
+    "itemPrice": "Item Price",
+    "serviceFee": "Service Fee (10%)",
+    "total": "Total",
+    "shippingNote": "International shipping calculated separately",
+    "buyNow": "Buy Now",
+    "placeBid": "Place Bid",
+    "currentBid": "Current Bid",
+    "bidders": "{{count}} bidders",
+    "timeLeft": "Time Left",
+    "seller": "Seller Info",
+    "rating": "Rating",
+    "description": "Description",
+    "translated": "Translated",
+    "original": "Original (JP)",
+    "condition": "Condition",
+    "platform": "Platform",
+    "brand": "Brand"
+  },
+  "conditions": {
+    "new": "New",
+    "like_new": "Like New",
+    "good": "Good",
+    "fair": "Fair",
+    "poor": "Poor"
+  },
+  "home": {
+    "featured": "Featured",
+    "categories": "Categories",
+    "searchHint": "Search Japanese goodies...",
+    "cat_figures": "Figures",
+    "cat_games": "Gaming",
+    "cat_electronics": "Electronics",
+    "cat_anime": "Anime Goods",
+    "cat_toys": "Toys & Blind Box",
+    "cat_camera": "Cameras",
+    "cat_brands": "Brands",
+    "cat_more": "More"
+  }
+}

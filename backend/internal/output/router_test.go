@@ -138,7 +138,7 @@ func TestRouter_EmptyProducts(t *testing.T) {
 // --- Test 5: ESSink and RedisSink stubs ---
 
 func TestESSink_Stub(t *testing.T) {
-	es := NewESSink("rakutao_products")
+	es := NewESSink(nil, "rakutao_products")
 	if es.Name() != "elasticsearch" {
 		t.Errorf("Name() = %q, want %q", es.Name(), "elasticsearch")
 	}
