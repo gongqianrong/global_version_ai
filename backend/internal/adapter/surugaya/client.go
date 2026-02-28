@@ -56,7 +56,7 @@ type detailData struct {
 	ImgList        []string          `json:"imgList"`
 	Tags           []string          `json:"tags"`
 	Category       categoryTree      `json:"category"`
-	Detail         map[string]string `json:"detail"`
+	Detail         map[string]interface{} `json:"detail"`
 	ShopSimpleInfo shopInfo          `json:"shopSimpleInfo"`
 	Types          []productType     `json:"types"`
 	OtherBranch    []otherBranch     `json:"otherBranch"`
