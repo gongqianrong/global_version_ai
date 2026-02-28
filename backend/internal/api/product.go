@@ -15,13 +15,16 @@ type ProductFetcher interface {
 }
 
 // ProductHandler handles product detail requests.
+// It tries the primary fetcher (ES) first, then falls back to the platform adapter.
 type ProductHandler struct {
-	fetcher ProductFetcher
+	fetcher  ProductFetcher
+	fallback ProductFetcher
 }
 
-// NewProductHandler creates a ProductHandler.
-func NewProductHandler(fetcher ProductFetcher) *ProductHandler {
-	return &ProductHandler{fetcher: fetcher}
+// NewProductHandler creates a ProductHandler with an optional fallback fetcher.
+// The fallback is used when the primary fetcher (typically ES) returns an error.
+func NewProductHandler(fetcher ProductFetcher, fallback ProductFetcher) *ProductHandler {
+	return &ProductHandler{fetcher: fetcher, fallback: fallback}
 }
 
 // HandleGetProduct handles GET /api/v1/products/{id}.
@@ -33,6 +36,9 @@ func (h *ProductHandler) HandleGetProduct(w http.ResponseWriter, r *http.Request
 	}
 
 	product, err := h.fetcher.GetProduct(r.Context(), id)
+	if err != nil && h.fallback != nil {
+		product, err = h.fallback.GetProduct(r.Context(), id)
+	}
 	if err != nil {
 		ErrorWithCode(w, r, http.StatusNotFound, 40401, "product not found")
 		return

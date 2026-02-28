@@ -118,7 +118,7 @@ func main() {
 	// --- Build handlers ---
 	searchHandler := api.NewSearchHandler(gateway, esSearcher, streamManager)
 	realtimeHandler := api.NewRealtimeHandler(streamManager, platformService, platformService)
-	productHandler := api.NewProductHandler(esFetcher)
+	productHandler := api.NewProductHandler(esFetcher, platformService)
 	healthHandler := api.NewHealthHandler(reg)
 	platformSearchHandler := api.NewPlatformSearchHandler(platformService)
 

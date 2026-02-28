@@ -40,7 +40,7 @@ func TestHandleGetProduct_Success(t *testing.T) {
 			ListedAt:        time.Date(2026, 2, 20, 10, 0, 0, 0, time.UTC),
 		},
 	}
-	handler := NewProductHandler(fetcher)
+	handler := NewProductHandler(fetcher, nil)
 
 	r := chi.NewRouter()
 	r.Get("/products/{id}", handler.HandleGetProduct)
@@ -79,7 +79,7 @@ func TestHandleGetProduct_Success(t *testing.T) {
 
 func TestHandleGetProduct_NotFound(t *testing.T) {
 	fetcher := &mockProductFetcher{err: errors.New("not found")}
-	handler := NewProductHandler(fetcher)
+	handler := NewProductHandler(fetcher, nil)
 
 	r := chi.NewRouter()
 	r.Get("/products/{id}", handler.HandleGetProduct)
@@ -109,7 +109,7 @@ func TestHandleGetProduct_DefaultLang(t *testing.T) {
 			ListedAt:        time.Now(),
 		},
 	}
-	handler := NewProductHandler(fetcher)
+	handler := NewProductHandler(fetcher, nil)
 
 	r := chi.NewRouter()
 	r.Get("/products/{id}", handler.HandleGetProduct)

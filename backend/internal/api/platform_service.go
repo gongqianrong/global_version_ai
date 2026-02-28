@@ -66,6 +66,32 @@ func (s *PlatformSearchService) SearchPlatform(ctx context.Context, platformID s
 	return summaries, result.Total, nil
 }
 
+// GetProduct fetches a single product from a platform adapter and normalizes it.
+// The productID should be in unified format: "platform_rawID" (e.g. "surugaya_663043159").
+func (s *PlatformSearchService) GetProduct(ctx context.Context, productID string) (*domain.UnifiedProduct, error) {
+	platform, rawID := domain.ParseProductID(productID)
+	if platform == "" || rawID == "" {
+		return nil, fmt.Errorf("platform service: invalid product ID %q", productID)
+	}
+
+	adapter, err := s.registry.GetAdapter(platform)
+	if err != nil {
+		return nil, fmt.Errorf("platform service: %w", err)
+	}
+
+	raw, err := adapter.GetProduct(ctx, rawID)
+	if err != nil {
+		return nil, fmt.Errorf("platform service: get product %s/%s: %w", platform, rawID, err)
+	}
+
+	product, err := s.normalizer.Normalize(platform, *raw)
+	if err != nil {
+		return nil, fmt.Errorf("platform service: normalize %s/%s: %w", platform, rawID, err)
+	}
+
+	return product, nil
+}
+
 // RealtimePlatformIDs implements PlatformLister.
 // Returns the IDs of all registered platforms that support real-time search.
 func (s *PlatformSearchService) RealtimePlatformIDs() []string {

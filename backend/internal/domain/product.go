@@ -1,7 +1,10 @@
 // Package domain defines the core domain models for the Rakutao collection gateway.
 package domain
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // Status constants represent the lifecycle state of a product listing.
 const (
@@ -36,6 +39,16 @@ const (
 // NewProductID builds a unified product ID by combining platform and source ID.
 func NewProductID(platform, sourceID string) string {
 	return platform + "_" + sourceID
+}
+
+// ParseProductID splits a unified product ID into platform and source ID.
+// Returns empty strings if the ID is not in the expected format.
+func ParseProductID(id string) (platform, sourceID string) {
+	idx := strings.Index(id, "_")
+	if idx <= 0 || idx >= len(id)-1 {
+		return "", ""
+	}
+	return id[:idx], id[idx+1:]
 }
 
 // UnifiedProduct is the canonical representation of a product collected from
