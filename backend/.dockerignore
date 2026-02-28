@@ -4,3 +4,7 @@ bin/
 gateway
 Makefile
 scripts/
+go.mod
+go.sum
+cmd/
+internal/
