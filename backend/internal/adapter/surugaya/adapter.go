@@ -200,6 +200,12 @@ func detailToRawProduct(goodsID string, d *detailData) domain.RawProduct {
 		rawData["sale_type"] = d.Types[0].Kubun
 		rawData["stock"] = d.Types[0].Stock
 		rawData["status"] = d.Types[0].State
+	} else {
+		// No purchase types (sold out). Try list price from detail map.
+		if listPrice, ok := d.Detail["定価"]; ok {
+			rawData["price"] = listPrice
+		}
+		rawData["status"] = "品切れ"
 	}
 
 	// All purchase types for display.
