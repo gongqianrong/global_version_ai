@@ -107,12 +107,14 @@ type nyukaInfo struct {
 
 // --- Extend types (comments + similar) ---
 
-type extendData struct {
-	Comments  []comment     `json:"comments"`
-	OtherList []similarItem `json:"otherList"`
+// ExtendData holds comments and similar products for a product.
+type ExtendData struct {
+	Comments  []Comment     `json:"comments"`
+	OtherList []SimilarItem `json:"otherList"`
 }
 
-type comment struct {
+// Comment represents a product review/comment.
+type Comment struct {
 	Star     string `json:"star"`
 	Title    string `json:"title"`
 	UserID   string `json:"userId"`
@@ -121,7 +123,8 @@ type comment struct {
 	Other    string `json:"other"`
 }
 
-type similarItem struct {
+// SimilarItem represents a similar product recommendation.
+type SimilarItem struct {
 	Img   string  `json:"img"`
 	MID   string  `json:"mid"`
 	Name  string  `json:"name"`
@@ -131,11 +134,13 @@ type similarItem struct {
 
 // --- Store types ---
 
-type storeData struct {
-	Stores []storeEntry `json:"stores"`
+// StoreData holds other available stores for a product.
+type StoreData struct {
+	Stores []StoreEntry `json:"stores"`
 }
 
-type storeEntry struct {
+// StoreEntry represents a single store offering.
+type StoreEntry struct {
 	BranchNumber string  `json:"branchNumber"`
 	BuyState     bool    `json:"buyState"`
 	CartID       string  `json:"cartId"`
@@ -155,37 +160,43 @@ type storeEntry struct {
 
 // --- Discount types ---
 
-type discountData struct {
-	TimeSale    []timeSaleEntry    `json:"timeSale"`
-	UnifiedSale []unifiedSaleEntry `json:"unifiedSale"`
+// DiscountData holds current discount/sale information.
+type DiscountData struct {
+	TimeSale    []TimeSaleEntry    `json:"timeSale"`
+	UnifiedSale []UnifiedSaleEntry `json:"unifiedSale"`
 }
 
-type timeSaleEntry struct {
+// TimeSaleEntry represents a time-limited sale.
+type TimeSaleEntry struct {
 	Content string `json:"content"`
 	PicLink string `json:"picLink"`
 	Title   string `json:"title"`
 }
 
-type unifiedSaleEntry struct {
+// UnifiedSaleEntry represents a platform-wide sale.
+type UnifiedSaleEntry struct {
 	ActiveTime string              `json:"activeTime"`
-	Conditions []discountCondition `json:"conditions"`
+	Conditions []DiscountCondition `json:"conditions"`
 	Content    string              `json:"content"`
 	Title      string              `json:"title"`
 }
 
-type discountCondition struct {
+// DiscountCondition represents a discount tier.
+type DiscountCondition struct {
 	Count    string `json:"count"`
 	Discount string `json:"discount"`
 }
 
 // --- User comments types ---
 
-type userCommentsData struct {
-	Comments []userComment `json:"comments"`
+// UserCommentsData holds a user's comment history.
+type UserCommentsData struct {
+	Comments []UserComment `json:"comments"`
 	Platform int           `json:"platform"`
 }
 
-type userComment struct {
+// UserComment represents a single user comment.
+type UserComment struct {
 	Comment  string `json:"comment"`
 	Other    string `json:"other"`
 	Star     string `json:"star"`
@@ -195,59 +206,68 @@ type userComment struct {
 
 // --- Campaign types ---
 
-type campaignData struct {
-	Campaigns []campaign `json:"campaigns"`
+// CampaignData holds the campaign list.
+type CampaignData struct {
+	Campaigns []Campaign `json:"campaigns"`
 }
 
-type campaign struct {
-	Conditions []campaignCondition `json:"conditions"`
+// Campaign represents a single campaign.
+type Campaign struct {
+	Conditions []CampaignCondition `json:"conditions"`
 	Detail     string              `json:"detail"`
 	Image      string              `json:"image"`
 	Title      string              `json:"title"`
-	URLList    []campaignURL       `json:"urlList"`
+	URLList    []CampaignURL       `json:"urlList"`
 }
 
-type campaignCondition struct {
+// CampaignCondition represents a campaign discount tier.
+type CampaignCondition struct {
 	Discount string `json:"discount"`
 	Num      string `json:"num"`
 }
 
-type campaignURL struct {
+// CampaignURL represents a campaign link.
+type CampaignURL struct {
 	Alt string `json:"alt"`
 	URL string `json:"url"`
 }
 
 // --- Campaign detail types ---
 
-type campaignDetailData struct {
-	Campaigns []campaignDetailEntry `json:"campaigns"`
-	Groups    []campaignGroup       `json:"groups"`
+// CampaignDetailData holds campaign detail information.
+type CampaignDetailData struct {
+	Campaigns []CampaignDetailEntry `json:"campaigns"`
+	Groups    []CampaignGroup       `json:"groups"`
 }
 
-type campaignDetailEntry struct {
+// CampaignDetailEntry represents a campaign detail entry.
+type CampaignDetailEntry struct {
 	Condition string `json:"condition"`
 	Desc      string `json:"desc"`
 	Image     string `json:"image"`
 	Title     string `json:"title"`
 }
 
-type campaignGroup struct {
+// CampaignGroup represents a group of items in a campaign.
+type CampaignGroup struct {
 	Title             string                 `json:"title"`
-	Items             []campaignGroupItem    `json:"items"`
+	Items             []CampaignGroupItem    `json:"items"`
 	OtherSearchParams map[string]interface{} `json:"otherSearchParams"`
 }
 
-type campaignGroupItem struct {
+// CampaignGroupItem represents a single item in a campaign group.
+type CampaignGroupItem struct {
 	CanBuy       bool                   `json:"canBuy"`
 	DetailParams map[string]interface{} `json:"detailParams"`
 	ID           string                 `json:"id"`
 	Image        string                 `json:"image"`
 	Name         string                 `json:"name"`
 	URL          string                 `json:"url"`
-	PriceList    []campaignPrice        `json:"priceList"`
+	PriceList    []CampaignPrice        `json:"priceList"`
 }
 
-type campaignPrice struct {
+// CampaignPrice represents a price entry in a campaign item.
+type CampaignPrice struct {
 	IsRange  bool    `json:"isRange"`
 	Price    float64 `json:"price"`
 	Status   string  `json:"status"`
@@ -427,13 +447,13 @@ func (c *Client) GetProductDetail(ctx context.Context, goodsID string) (*detailD
 }
 
 // GetProductExtend fetches comments and similar products.
-func (c *Client) GetProductExtend(ctx context.Context, goodsID string) (*extendData, error) {
+func (c *Client) GetProductExtend(ctx context.Context, goodsID string) (*ExtendData, error) {
 	envelope, err := c.doGet(ctx, "/suruga/product/extend/"+goodsID, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var data extendData
+	var data ExtendData
 	if err := json.Unmarshal(envelope.Data, &data); err != nil {
 		return nil, fmt.Errorf("surugaya: decode extend data: %w", err)
 	}
@@ -441,13 +461,13 @@ func (c *Client) GetProductExtend(ctx context.Context, goodsID string) (*extendD
 }
 
 // GetProductStores fetches other available stores for a product.
-func (c *Client) GetProductStores(ctx context.Context, goodsID string) (*storeData, error) {
+func (c *Client) GetProductStores(ctx context.Context, goodsID string) (*StoreData, error) {
 	envelope, err := c.doGet(ctx, "/suruga/product/extend/store/"+goodsID, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var data storeData
+	var data StoreData
 	if err := json.Unmarshal(envelope.Data, &data); err != nil {
 		return nil, fmt.Errorf("surugaya: decode store data: %w", err)
 	}
@@ -455,13 +475,13 @@ func (c *Client) GetProductStores(ctx context.Context, goodsID string) (*storeDa
 }
 
 // GetDiscount fetches current discount/sale information.
-func (c *Client) GetDiscount(ctx context.Context) (*discountData, error) {
+func (c *Client) GetDiscount(ctx context.Context) (*DiscountData, error) {
 	envelope, err := c.doGet(ctx, "/suruga/product/discount", nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var data discountData
+	var data DiscountData
 	if err := json.Unmarshal(envelope.Data, &data); err != nil {
 		return nil, fmt.Errorf("surugaya: decode discount data: %w", err)
 	}
@@ -469,7 +489,7 @@ func (c *Client) GetDiscount(ctx context.Context) (*discountData, error) {
 }
 
 // GetUserComments fetches a user's comment history.
-func (c *Client) GetUserComments(ctx context.Context, params UserCommentsParams) (*userCommentsData, error) {
+func (c *Client) GetUserComments(ctx context.Context, params UserCommentsParams) (*UserCommentsData, error) {
 	q := url.Values{}
 	q.Set("user_id", params.UserID)
 	q.Set("page_num", strconv.Itoa(params.PageNum))
@@ -481,7 +501,7 @@ func (c *Client) GetUserComments(ctx context.Context, params UserCommentsParams)
 		return nil, err
 	}
 
-	var data userCommentsData
+	var data UserCommentsData
 	if err := json.Unmarshal(envelope.Data, &data); err != nil {
 		return nil, fmt.Errorf("surugaya: decode user comments data: %w", err)
 	}
@@ -489,13 +509,13 @@ func (c *Client) GetUserComments(ctx context.Context, params UserCommentsParams)
 }
 
 // GetCampaigns fetches the campaign list.
-func (c *Client) GetCampaigns(ctx context.Context) (*campaignData, error) {
+func (c *Client) GetCampaigns(ctx context.Context) (*CampaignData, error) {
 	envelope, err := c.doGet(ctx, "/suruga/product/campaign", nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var data campaignData
+	var data CampaignData
 	if err := json.Unmarshal(envelope.Data, &data); err != nil {
 		return nil, fmt.Errorf("surugaya: decode campaign data: %w", err)
 	}
@@ -503,7 +523,7 @@ func (c *Client) GetCampaigns(ctx context.Context) (*campaignData, error) {
 }
 
 // GetCampaignDetail fetches campaign detail by URL.
-func (c *Client) GetCampaignDetail(ctx context.Context, detailURL string) (*campaignDetailData, error) {
+func (c *Client) GetCampaignDetail(ctx context.Context, detailURL string) (*CampaignDetailData, error) {
 	q := url.Values{}
 	q.Set("url", detailURL)
 
@@ -512,7 +532,7 @@ func (c *Client) GetCampaignDetail(ctx context.Context, detailURL string) (*camp
 		return nil, err
 	}
 
-	var data campaignDetailData
+	var data CampaignDetailData
 	if err := json.Unmarshal(envelope.Data, &data); err != nil {
 		return nil, fmt.Errorf("surugaya: decode campaign detail data: %w", err)
 	}

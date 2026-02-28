@@ -12,6 +12,7 @@ type RouterConfig struct {
 	ProductHandler        *ProductHandler
 	HealthHandler         *HealthHandler
 	PlatformSearchHandler *PlatformSearchHandler
+	SurugayaHandler       *SurugayaHandler
 }
 
 // NewRouter creates a chi router with all API routes and middleware.
@@ -39,6 +40,16 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 		r.Get("/search/stream/{streamID}", cfg.RealtimeHandler.HandleStream)
 		r.Get("/products/{id}", cfg.ProductHandler.HandleGetProduct)
 		r.Get("/platform/search", cfg.PlatformSearchHandler.HandleSearch)
+
+		// Surugaya extension endpoints.
+		r.Route("/surugaya", func(r chi.Router) {
+			r.Get("/products/{id}/reviews", cfg.SurugayaHandler.HandleProductReviews)
+			r.Get("/products/{id}/stores", cfg.SurugayaHandler.HandleProductStores)
+			r.Get("/discounts", cfg.SurugayaHandler.HandleDiscounts)
+			r.Get("/comments", cfg.SurugayaHandler.HandleUserComments)
+			r.Get("/campaigns", cfg.SurugayaHandler.HandleCampaigns)
+			r.Get("/campaigns/detail", cfg.SurugayaHandler.HandleCampaignDetail)
+		})
 	})
 
 	return r

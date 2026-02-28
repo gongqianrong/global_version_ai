@@ -122,6 +122,10 @@ func main() {
 	healthHandler := api.NewHealthHandler(reg)
 	platformSearchHandler := api.NewPlatformSearchHandler(platformService)
 
+	// Surugaya extension handler (direct client access).
+	surugayaAdapter, _ := reg.GetAdapter("surugaya")
+	surugayaHandler := api.NewSurugayaHandler(surugayaAdapter.(*surugaya.Adapter).Client())
+
 	// --- Build router ---
 	router := api.NewRouter(api.RouterConfig{
 		SearchHandler:         searchHandler,
@@ -129,6 +133,7 @@ func main() {
 		ProductHandler:        productHandler,
 		HealthHandler:         healthHandler,
 		PlatformSearchHandler: platformSearchHandler,
+		SurugayaHandler:       surugayaHandler,
 	})
 
 	// --- Start server ---
