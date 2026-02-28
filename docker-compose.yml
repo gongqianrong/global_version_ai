@@ -15,6 +15,10 @@ services:
       - SURUGAYA_API_URL=http://153.231.197.185
       - YAHOO_AUCTION_API_URL=http://yahoo-proxy:3001
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
       interval: 10s
@@ -26,6 +30,10 @@ services:
     ports:
       - "8000:8000"
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
@@ -39,10 +47,15 @@ services:
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.ml.enabled=false
+      - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
     volumes:
       - es-data:/usr/share/elasticsearch/data
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
       interval: 10s
@@ -75,24 +88,26 @@ services:
         echo ""
         echo "Index created successfully."
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    restart: unless-stopped
+  # Redis 和 PostgreSQL 暂未使用，注释掉节省内存
+  # 需要时取消注释即可
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   restart: unless-stopped
 
-  postgres:
-    image: postgres:16-alpine
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_USER=rakutao
-      - POSTGRES_PASSWORD=rakutao
-      - POSTGRES_DB=rakutao
-    volumes:
-      - pg-data:/var/lib/postgresql/data
-    restart: unless-stopped
+  # postgres:
+  #   image: postgres:16-alpine
+  #   ports:
+  #     - "5432:5432"
+  #   environment:
+  #     - POSTGRES_USER=rakutao
+  #     - POSTGRES_PASSWORD=rakutao
+  #     - POSTGRES_DB=rakutao
+  #   volumes:
+  #     - pg-data:/var/lib/postgresql/data
+  #   restart: unless-stopped
 
 volumes:
   es-data:
-  pg-data:
+  # pg-data:
