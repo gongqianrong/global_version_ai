@@ -130,6 +130,70 @@ func TestHandleGetProduct_DefaultLang(t *testing.T) {
 	}
 }
 
+func TestHandleGetProduct_Fallback(t *testing.T) {
+	esFetcher := &mockProductFetcher{err: errors.New("es: not found")}
+	fallback := &mockProductFetcher{
+		product: &domain.UnifiedProduct{
+			ID:             "surugaya_663043159",
+			SourcePlatform: "surugaya",
+			Title:          "FW GUNDAM CONVERGE SB ニカーヤ",
+			PriceJPY:       5445,
+			ListedAt:       time.Now(),
+		},
+	}
+	handler := NewProductHandler(esFetcher, fallback)
+
+	r := chi.NewRouter()
+	r.Get("/products/{id}", handler.HandleGetProduct)
+
+	req := httptest.NewRequest("GET", "/products/surugaya_663043159", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d (fallback should succeed)", w.Code, http.StatusOK)
+	}
+
+	var resp APIResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+	if resp.Code != 0 {
+		t.Errorf("code = %d, want 0", resp.Code)
+	}
+
+	data, _ := json.Marshal(resp.Data)
+	var product ProductResponse
+	json.Unmarshal(data, &product)
+	if product.ID != "surugaya_663043159" {
+		t.Errorf("ID = %q, want %q", product.ID, "surugaya_663043159")
+	}
+	if product.PriceJPY != 5445 {
+		t.Errorf("PriceJPY = %d, want 5445", product.PriceJPY)
+	}
+}
+
+func TestHandleGetProduct_BothFail(t *testing.T) {
+	esFetcher := &mockProductFetcher{err: errors.New("es: not found")}
+	fallback := &mockProductFetcher{err: errors.New("adapter: not found")}
+	handler := NewProductHandler(esFetcher, fallback)
+
+	r := chi.NewRouter()
+	r.Get("/products/{id}", handler.HandleGetProduct)
+
+	req := httptest.NewRequest("GET", "/products/surugaya_999", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusNotFound)
+	}
+
+	var resp APIResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+	if resp.Code != 40401 {
+		t.Errorf("code = %d, want 40401", resp.Code)
+	}
+}
+
 func TestBuildProductResponse_NoTranslation(t *testing.T) {
 	p := &domain.UnifiedProduct{
 		ID:       "p1",

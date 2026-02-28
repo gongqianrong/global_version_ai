@@ -133,6 +133,87 @@ func TestPlatformSearchService_SearchPlatform_SkipsBadProducts(t *testing.T) {
 	}
 }
 
+func TestPlatformSearchService_GetProduct_Success(t *testing.T) {
+	reg := registry.New()
+	adapter := &testAdapter{
+		id: "surugaya",
+		result: &domain.SearchResult{
+			Products: []domain.RawProduct{
+				{Platform: "surugaya", RawID: "663043159", RawData: map[string]interface{}{"title": "Test", "price": float64(4950)}},
+			},
+			Total: 1,
+		},
+	}
+	// Override GetProduct to return a valid product.
+	productAdapter := &testAdapterWithProduct{
+		testAdapter: *adapter,
+		product: &domain.RawProduct{
+			Platform: "surugaya",
+			RawID:    "663043159",
+			RawData: map[string]interface{}{
+				"title": "FW GUNDAM CONVERGE SB ニカーヤ",
+				"price": float64(4950),
+			},
+		},
+	}
+	reg.Register(registry.PlatformMeta{
+		ID:     "surugaya",
+		Status: registry.StatusActive,
+		Caps:   adapter.Capabilities(),
+	}, productAdapter)
+
+	norm := normalizer.New(nil)
+	svc := NewPlatformSearchService(reg, norm)
+
+	product, err := svc.GetProduct(context.Background(), "surugaya_663043159")
+	if err != nil {
+		t.Fatalf("GetProduct error: %v", err)
+	}
+	if product.ID != "surugaya_663043159" {
+		t.Errorf("ID = %q, want %q", product.ID, "surugaya_663043159")
+	}
+	if product.Title != "FW GUNDAM CONVERGE SB ニカーヤ" {
+		t.Errorf("Title = %q", product.Title)
+	}
+	// 4950 + 10% = 5445
+	if product.PriceJPY != 5445 {
+		t.Errorf("PriceJPY = %d, want 5445", product.PriceJPY)
+	}
+}
+
+func TestPlatformSearchService_GetProduct_InvalidID(t *testing.T) {
+	reg := registry.New()
+	norm := normalizer.New(nil)
+	svc := NewPlatformSearchService(reg, norm)
+
+	_, err := svc.GetProduct(context.Background(), "nounderscore")
+	if err == nil {
+		t.Fatal("expected error for invalid ID format")
+	}
+}
+
+func TestPlatformSearchService_GetProduct_PlatformNotFound(t *testing.T) {
+	reg := registry.New()
+	norm := normalizer.New(nil)
+	svc := NewPlatformSearchService(reg, norm)
+
+	_, err := svc.GetProduct(context.Background(), "nonexistent_123")
+	if err == nil {
+		t.Fatal("expected error for unregistered platform")
+	}
+}
+
+// testAdapterWithProduct extends testAdapter with a GetProduct implementation.
+type testAdapterWithProduct struct {
+	testAdapter
+	product *domain.RawProduct
+	err     error
+}
+
+func (a *testAdapterWithProduct) GetProduct(_ context.Context, _ string) (*domain.RawProduct, error) {
+	return a.product, a.err
+}
+
 func TestPlatformSearchService_RealtimePlatformIDs(t *testing.T) {
 	reg := registry.New()
 

@@ -8,12 +8,15 @@ services:
         condition: service_healthy
       ai-service:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       - ELASTICSEARCH_URL=http://elasticsearch:9200
       - ES_INDEX_NAME=rakutao_products
       - AI_SERVICE_URL=http://ai-service:8000
       - SURUGAYA_API_URL=http://153.231.197.185
       - YAHOO_AUCTION_API_URL=http://yahoo-proxy:3001
+      - REDIS_URL=redis://redis:6379
     restart: unless-stopped
     deploy:
       resources:
@@ -88,13 +91,20 @@ services:
         echo ""
         echo "Index created successfully."
 
-  # Redis 和 PostgreSQL 暂未使用，注释掉节省内存
-  # 需要时取消注释即可
-  # redis:
-  #   image: redis:7-alpine
-  #   ports:
-  #     - "6379:6379"
-  #   restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   # postgres:
   #   image: postgres:16-alpine

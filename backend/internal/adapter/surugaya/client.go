@@ -539,6 +539,46 @@ func (c *Client) GetCampaignDetail(ctx context.Context, detailURL string) (*Camp
 	return &data, nil
 }
 
+// CategoryItem represents a single category entry.
+type CategoryItem struct {
+	CategoryID   string `json:"category_id"`
+	CategoryName string `json:"category_name"`
+}
+
+// CategoryData holds the category list response.
+type CategoryData struct {
+	Category []CategoryItem `json:"category"`
+	Platform int            `json:"platform,omitempty"`
+}
+
+// GetCategories fetches the top-level category menu.
+func (c *Client) GetCategories(ctx context.Context) (*CategoryData, error) {
+	envelope, err := c.doGet(ctx, "/suruga/category/search/adv", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var data CategoryData
+	if err := json.Unmarshal(envelope.Data, &data); err != nil {
+		return nil, fmt.Errorf("surugaya: decode category data: %w", err)
+	}
+	return &data, nil
+}
+
+// GetSubCategories fetches sub-categories for a given parent category ID.
+func (c *Client) GetSubCategories(ctx context.Context, categoryID string) (*CategoryData, error) {
+	envelope, err := c.doGet(ctx, "/suruga/category/search/adv/"+categoryID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var data CategoryData
+	if err := json.Unmarshal(envelope.Data, &data); err != nil {
+		return nil, fmt.Errorf("surugaya: decode sub-category data: %w", err)
+	}
+	return &data, nil
+}
+
 // Health calls the base URL to verify connectivity.
 func (c *Client) Health(ctx context.Context) error {
 	// Use search with a minimal query as a health probe since

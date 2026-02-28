@@ -2,10 +2,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rakutao/collection-gateway/internal/adapter/surugaya"
@@ -13,6 +15,7 @@ import (
 	"github.com/rakutao/collection-gateway/internal/aiclient"
 	"github.com/rakutao/collection-gateway/internal/api"
 	"github.com/rakutao/collection-gateway/internal/brand"
+	"github.com/rakutao/collection-gateway/internal/cache"
 	"github.com/rakutao/collection-gateway/internal/domain"
 	"github.com/rakutao/collection-gateway/internal/filter"
 	"github.com/rakutao/collection-gateway/internal/normalizer"
@@ -126,6 +129,30 @@ func main() {
 	surugayaAdapter, _ := reg.GetAdapter("surugaya")
 	surugayaHandler := api.NewSurugayaHandler(surugayaAdapter.(*surugaya.Adapter).Client())
 
+	// --- Redis cache ---
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		redisURL = "redis://localhost:6379"
+	}
+
+	var cacheMiddleware func(http.Handler) http.Handler
+	cacheClient, err := cache.New(redisURL)
+	if err != nil {
+		log.Printf("WARNING: Redis cache disabled (invalid URL): %v", err)
+	} else {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		if pingErr := cacheClient.Ping(ctx); pingErr != nil {
+			log.Printf("WARNING: Redis not reachable, caching disabled: %v", pingErr)
+			cacheClient = nil
+		} else {
+			cacheMiddleware = cache.Middleware(cacheClient)
+		}
+		cancel()
+	}
+	if cacheClient != nil {
+		defer cacheClient.Close()
+	}
+
 	// --- Build router ---
 	router := api.NewRouter(api.RouterConfig{
 		SearchHandler:         searchHandler,
@@ -134,6 +161,7 @@ func main() {
 		HealthHandler:         healthHandler,
 		PlatformSearchHandler: platformSearchHandler,
 		SurugayaHandler:       surugayaHandler,
+		CacheMiddleware:       cacheMiddleware,
 	})
 
 	// --- Start server ---
@@ -148,6 +176,11 @@ func main() {
 	log.Printf("  Yahoo Auction API: %s", yahooURL)
 	log.Printf("  Surugaya API:      %s", surugayaURL)
 	log.Printf("  Elasticsearch:     %s (index: %s)", esURL, esIndexName)
+	if cacheClient != nil {
+		log.Printf("  Redis Cache:       %s", redisURL)
+	} else {
+		log.Printf("  Redis Cache:       disabled")
+	}
 
 	if err := http.ListenAndServe(addr, router); err != nil {
 		log.Fatalf("server error: %v", err)

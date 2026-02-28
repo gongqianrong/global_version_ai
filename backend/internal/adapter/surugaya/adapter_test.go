@@ -528,6 +528,94 @@ func TestMapConditionToSaleClassified(t *testing.T) {
 	}
 }
 
+// --- Sold-out product tests ---
+
+func TestGetProduct_SoldOut(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/suruga/product/detail/663043159" {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+
+		detail := detailData{
+			BuyState: false,
+			Title:    "FW GUNDAM CONVERGE SB ニカーヤ",
+			Desc:     "プレミアムバンダイ限定",
+			ImgList:  []string{"img1.jpg"},
+			Types:    []productType{}, // empty — sold out
+			Detail:   map[string]interface{}{"定価": float64(4950), "メーカー": "バンダイ"},
+			ShopSimpleInfo: shopInfo{
+				ShopName: "駿河屋",
+			},
+		}
+
+		dataBytes, _ := json.Marshal(detail)
+		resp := apiResponse{Code: 200, Data: dataBytes, Msg: "成功！"}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	a := New(srv.URL, nil)
+	rp, err := a.GetProduct(context.Background(), "663043159")
+	if err != nil {
+		t.Fatalf("GetProduct error: %v", err)
+	}
+
+	// Price should come from detail["定価"]
+	if rp.RawData["price"] != float64(4950) {
+		t.Errorf("price = %v, want 4950 (from 定価)", rp.RawData["price"])
+	}
+	// Status should be 品切れ
+	if rp.RawData["status"] != "品切れ" {
+		t.Errorf("status = %v, want 品切れ", rp.RawData["status"])
+	}
+	// buy_state should be false
+	if rp.RawData["buy_state"] != false {
+		t.Errorf("buy_state = %v, want false", rp.RawData["buy_state"])
+	}
+}
+
+func TestDetailToRawProduct_EmptyTypes(t *testing.T) {
+	d := &detailData{
+		BuyState: false,
+		Title:    "売り切れ商品",
+		Types:    []productType{},
+		Detail:   map[string]interface{}{"定価": float64(3000)},
+	}
+
+	rp := detailToRawProduct("test-001", d)
+
+	if rp.RawData["price"] != float64(3000) {
+		t.Errorf("price = %v, want 3000", rp.RawData["price"])
+	}
+	if rp.RawData["status"] != "品切れ" {
+		t.Errorf("status = %v, want 品切れ", rp.RawData["status"])
+	}
+	if rp.RawData["title"] != "売り切れ商品" {
+		t.Errorf("title = %v", rp.RawData["title"])
+	}
+}
+
+func TestDetailToRawProduct_EmptyTypesNoListPrice(t *testing.T) {
+	d := &detailData{
+		BuyState: false,
+		Title:    "定価なし商品",
+		Types:    []productType{},
+		Detail:   map[string]interface{}{"メーカー": "テスト"},
+	}
+
+	rp := detailToRawProduct("test-002", d)
+
+	// No list price and no types: price should not be set
+	if _, has := rp.RawData["price"]; has {
+		t.Errorf("expected no price key, got %v", rp.RawData["price"])
+	}
+	if rp.RawData["status"] != "品切れ" {
+		t.Errorf("status = %v, want 品切れ", rp.RawData["status"])
+	}
+}
+
 // --- helper ---
 
 func strPtr(s string) *string {

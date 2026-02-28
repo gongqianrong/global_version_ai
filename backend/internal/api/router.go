@@ -1,6 +1,8 @@
 package api
 
 import (
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 )
@@ -13,6 +15,7 @@ type RouterConfig struct {
 	HealthHandler         *HealthHandler
 	PlatformSearchHandler *PlatformSearchHandler
 	SurugayaHandler       *SurugayaHandler
+	CacheMiddleware       func(http.Handler) http.Handler
 }
 
 // NewRouter creates a chi router with all API routes and middleware.
@@ -36,6 +39,10 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 
 	// API v1
 	r.Route("/api/v1", func(r chi.Router) {
+		if cfg.CacheMiddleware != nil {
+			r.Use(cfg.CacheMiddleware)
+		}
+
 		r.Get("/search", cfg.SearchHandler.HandleSearch)
 		r.Get("/search/stream/{streamID}", cfg.RealtimeHandler.HandleStream)
 		r.Get("/products/{id}", cfg.ProductHandler.HandleGetProduct)
@@ -49,6 +56,8 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 			r.Get("/comments", cfg.SurugayaHandler.HandleUserComments)
 			r.Get("/campaigns", cfg.SurugayaHandler.HandleCampaigns)
 			r.Get("/campaigns/detail", cfg.SurugayaHandler.HandleCampaignDetail)
+			r.Get("/categories", cfg.SurugayaHandler.HandleCategories)
+			r.Get("/categories/{id}", cfg.SurugayaHandler.HandleSubCategories)
 		})
 	})
 

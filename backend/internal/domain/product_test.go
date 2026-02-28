@@ -105,6 +105,35 @@ func TestContentRatingConstants(t *testing.T) {
 	}
 }
 
+func TestParseProductID(t *testing.T) {
+	tests := []struct {
+		name       string
+		id         string
+		wantPlat   string
+		wantSource string
+	}{
+		{"standard", "surugaya_663043159", "surugaya", "663043159"},
+		{"multiple underscores", "yahoo_auction_abc123", "yahoo", "auction_abc123"},
+		{"no underscore", "nounderscore", "", ""},
+		{"empty string", "", "", ""},
+		{"leading underscore", "_abc", "", ""},
+		{"trailing underscore", "abc_", "", ""},
+		{"just underscore", "_", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plat, source := ParseProductID(tt.id)
+			if plat != tt.wantPlat {
+				t.Errorf("platform = %q, want %q", plat, tt.wantPlat)
+			}
+			if source != tt.wantSource {
+				t.Errorf("sourceID = %q, want %q", source, tt.wantSource)
+			}
+		})
+	}
+}
+
 func TestUnifiedProductStructFields(t *testing.T) {
 	now := time.Now()
 	p := UnifiedProduct{

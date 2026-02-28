@@ -127,3 +127,31 @@ func (h *SurugayaHandler) HandleCampaignDetail(w http.ResponseWriter, r *http.Re
 
 	Success(w, r, data)
 }
+
+// HandleCategories handles GET /api/v1/surugaya/categories.
+func (h *SurugayaHandler) HandleCategories(w http.ResponseWriter, r *http.Request) {
+	data, err := h.client.GetCategories(r.Context())
+	if err != nil {
+		ErrorWithCode(w, r, http.StatusServiceUnavailable, 50003, err.Error())
+		return
+	}
+
+	Success(w, r, data)
+}
+
+// HandleSubCategories handles GET /api/v1/surugaya/categories/{id}.
+func (h *SurugayaHandler) HandleSubCategories(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		ErrorWithCode(w, r, http.StatusBadRequest, 40002, "missing category ID")
+		return
+	}
+
+	data, err := h.client.GetSubCategories(r.Context(), id)
+	if err != nil {
+		ErrorWithCode(w, r, http.StatusServiceUnavailable, 50003, err.Error())
+		return
+	}
+
+	Success(w, r, data)
+}
