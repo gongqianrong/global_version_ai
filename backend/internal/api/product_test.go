@@ -41,7 +41,7 @@ func TestHandleGetProduct_Success(t *testing.T) {
 			ListedAt:        time.Date(2026, 2, 20, 10, 0, 0, 0, time.UTC),
 		},
 	}
-	handler := NewProductHandler(fetcher, nil)
+	handler := NewProductHandler(fetcher, nil, nil, nil)
 
 	r := chi.NewRouter()
 	r.Get("/products/{id}", handler.HandleGetProduct)
@@ -81,7 +81,7 @@ func TestHandleGetProduct_Success(t *testing.T) {
 
 func TestHandleGetProduct_NotFound(t *testing.T) {
 	fetcher := &mockProductFetcher{err: errors.New("not found")}
-	handler := NewProductHandler(fetcher, nil)
+	handler := NewProductHandler(fetcher, nil, nil, nil)
 
 	r := chi.NewRouter()
 	r.Get("/products/{id}", handler.HandleGetProduct)
@@ -111,7 +111,7 @@ func TestHandleGetProduct_DefaultLang(t *testing.T) {
 			ListedAt:        time.Now(),
 		},
 	}
-	handler := NewProductHandler(fetcher, nil)
+	handler := NewProductHandler(fetcher, nil, nil, nil)
 
 	r := chi.NewRouter()
 	r.Get("/products/{id}", handler.HandleGetProduct)
@@ -143,7 +143,7 @@ func TestHandleGetProduct_Fallback(t *testing.T) {
 			ListedAt:       time.Now(),
 		},
 	}
-	handler := NewProductHandler(esFetcher, fallback)
+	handler := NewProductHandler(esFetcher, fallback, nil, nil)
 
 	r := chi.NewRouter()
 	r.Get("/products/{id}", handler.HandleGetProduct)
@@ -176,7 +176,7 @@ func TestHandleGetProduct_Fallback(t *testing.T) {
 func TestHandleGetProduct_BothFail(t *testing.T) {
 	esFetcher := &mockProductFetcher{err: errors.New("es: not found")}
 	fallback := &mockProductFetcher{err: errors.New("adapter: not found")}
-	handler := NewProductHandler(esFetcher, fallback)
+	handler := NewProductHandler(esFetcher, fallback, nil, nil)
 
 	r := chi.NewRouter()
 	r.Get("/products/{id}", handler.HandleGetProduct)

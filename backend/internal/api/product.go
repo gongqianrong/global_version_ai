@@ -2,11 +2,13 @@ package api
 
 import (
 	"context"
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rakutao/collection-gateway/internal/domain"
 	"github.com/rakutao/collection-gateway/internal/i18n"
+	"github.com/rakutao/collection-gateway/internal/translate"
 )
 
 // ProductFetcher retrieves a product by its unified ID.
@@ -17,15 +19,18 @@ type ProductFetcher interface {
 
 // ProductHandler handles product detail requests.
 // It tries the primary fetcher (ES) first, then falls back to the platform adapter.
+// If the product has no translation for the requested language, it translates on-the-fly
+// and dispatches the updated product to ES asynchronously.
 type ProductHandler struct {
-	fetcher  ProductFetcher
-	fallback ProductFetcher
+	fetcher       ProductFetcher
+	fallback      ProductFetcher
+	translator    translate.Translator
+	productWriter ProductWriter
 }
 
 // NewProductHandler creates a ProductHandler with an optional fallback fetcher.
-// The fallback is used when the primary fetcher (typically ES) returns an error.
-func NewProductHandler(fetcher ProductFetcher, fallback ProductFetcher) *ProductHandler {
-	return &ProductHandler{fetcher: fetcher, fallback: fallback}
+func NewProductHandler(fetcher ProductFetcher, fallback ProductFetcher, tr translate.Translator, pw ProductWriter) *ProductHandler {
+	return &ProductHandler{fetcher: fetcher, fallback: fallback, translator: tr, productWriter: pw}
 }
 
 // HandleGetProduct handles GET /api/v1/products/{id}.
@@ -47,8 +52,52 @@ func (h *ProductHandler) HandleGetProduct(w http.ResponseWriter, r *http.Request
 
 	lang := i18n.FromContext(r.Context())
 
+	// Translate on-the-fly if missing for the requested language.
+	if lang != i18n.LangJA && h.translator != nil {
+		changed := h.translateProductIfNeeded(r.Context(), product, string(lang))
+		if changed && h.productWriter != nil {
+			go h.productWriter.Dispatch(context.Background(), []domain.UnifiedProduct{*product})
+		}
+	}
+
 	resp := buildProductResponse(product, lang)
 	Success(w, r, resp)
+}
+
+// translateProductIfNeeded translates title and description on-the-fly
+// if the product doesn't have a translation for the given language.
+// Returns true if any new translation was added.
+func (h *ProductHandler) translateProductIfNeeded(ctx context.Context, p *domain.UnifiedProduct, lang string) bool {
+	changed := false
+
+	if p.TitleTranslated == nil {
+		p.TitleTranslated = make(map[string]string)
+	}
+	if p.DescTranslated == nil {
+		p.DescTranslated = make(map[string]string)
+	}
+
+	if _, ok := p.TitleTranslated[lang]; !ok && p.Title != "" {
+		translated, err := h.translator.Translate(ctx, p.Title, "ja", lang)
+		if err != nil {
+			log.Printf("[translate] on-the-fly title error for %s→%s: %v", p.ID, lang, err)
+		} else {
+			p.TitleTranslated[lang] = translated
+			changed = true
+		}
+	}
+
+	if _, ok := p.DescTranslated[lang]; !ok && p.Description != "" {
+		translated, err := h.translator.Translate(ctx, p.Description, "ja", lang)
+		if err != nil {
+			log.Printf("[translate] on-the-fly desc error for %s→%s: %v", p.ID, lang, err)
+		} else {
+			p.DescTranslated[lang] = translated
+			changed = true
+		}
+	}
+
+	return changed
 }
 
 // ProductResponse is the API response for a product detail.
