@@ -20,7 +20,9 @@ import (
 	"github.com/rakutao/collection-gateway/internal/filter"
 	"github.com/rakutao/collection-gateway/internal/normalizer"
 	"github.com/rakutao/collection-gateway/internal/registry"
+	"github.com/rakutao/collection-gateway/internal/output"
 	"github.com/rakutao/collection-gateway/internal/search"
+	"github.com/rakutao/collection-gateway/internal/translate"
 )
 
 func main() {
@@ -118,12 +120,19 @@ func main() {
 	esSearcher := search.NewESSearcher(esClient, esIndexName)
 	esFetcher := search.NewESProductFetcher(esClient, esIndexName)
 
+	// --- Output pipeline (write search results to ES) ---
+	esSink := output.NewESSink(esClient, esIndexName)
+	outputRouter := output.NewRouter(esSink)
+	translator := translate.NewNoop() // placeholder until real translation API is integrated
+	translateSink := output.NewTranslateSink(translator)
+	productWriter := &asyncProductWriter{router: outputRouter, translateSink: translateSink}
+
 	// --- Build handlers ---
 	searchHandler := api.NewSearchHandler(gateway, esSearcher, streamManager)
-	realtimeHandler := api.NewRealtimeHandler(streamManager, platformService, platformService)
+	realtimeHandler := api.NewRealtimeHandler(streamManager, platformService, platformService, productWriter)
 	productHandler := api.NewProductHandler(esFetcher, platformService)
 	healthHandler := api.NewHealthHandler(reg)
-	platformSearchHandler := api.NewPlatformSearchHandler(platformService)
+	platformSearchHandler := api.NewPlatformSearchHandler(platformService, productWriter)
 
 	// Surugaya extension handler (direct client access).
 	surugayaAdapter, _ := reg.GetAdapter("surugaya")
@@ -185,4 +194,18 @@ func main() {
 	if err := http.ListenAndServe(addr, router); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
+}
+
+// asyncProductWriter enriches products with translations and dispatches them
+// to the output router for persistence (e.g. Elasticsearch).
+type asyncProductWriter struct {
+	router        *output.Router
+	translateSink *output.TranslateSink
+}
+
+func (w *asyncProductWriter) Dispatch(ctx context.Context, products []domain.UnifiedProduct) {
+	if w.translateSink != nil {
+		w.translateSink.Enrich(ctx, products)
+	}
+	w.router.Dispatch(ctx, products)
 }
