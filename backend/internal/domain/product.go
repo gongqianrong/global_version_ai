@@ -85,6 +85,13 @@ type UnifiedProduct struct {
 	Logistics       *LogisticsInfo    `json:"logistics,omitempty"`
 }
 
+// ProductTranslations holds only the translation maps, used for bulk-fetching
+// existing translations from ES to avoid redundant API calls.
+type ProductTranslations struct {
+	TitleTranslated map[string]string `json:"title_translated,omitempty"`
+	DescTranslated  map[string]string `json:"desc_translated,omitempty"`
+}
+
 // IsAvailable reports whether the product is currently available for purchase.
 func (p *UnifiedProduct) IsAvailable() bool {
 	return p.Status == StatusAvailable

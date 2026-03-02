@@ -129,14 +129,14 @@ func main() {
 	}
 	translator := translate.NewMall(mallTranslateURL, nil)
 	translateSink := output.NewTranslateSink(translator)
-	productWriter := &asyncProductWriter{router: outputRouter, translateSink: translateSink}
+	productWriter := &asyncProductWriter{router: outputRouter, translateSink: translateSink, esFetcher: esFetcher}
 
 	// --- Build handlers ---
 	searchHandler := api.NewSearchHandler(gateway, esSearcher, streamManager)
 	realtimeHandler := api.NewRealtimeHandler(streamManager, platformService, platformService, productWriter)
 	productHandler := api.NewProductHandler(esFetcher, platformService)
 	healthHandler := api.NewHealthHandler(reg)
-	platformSearchHandler := api.NewPlatformSearchHandler(platformService, productWriter)
+	platformSearchHandler := api.NewPlatformSearchHandler(platformService, productWriter, esFetcher)
 
 	// Surugaya extension handler (direct client access).
 	surugayaAdapter, _ := reg.GetAdapter("surugaya")
@@ -202,14 +202,49 @@ func main() {
 
 // asyncProductWriter enriches products with translations and dispatches them
 // to the output router for persistence (e.g. Elasticsearch).
+// It first checks ES for existing translations to avoid redundant API calls.
 type asyncProductWriter struct {
 	router        *output.Router
 	translateSink *output.TranslateSink
+	esFetcher     *search.ESProductFetcher
 }
 
 func (w *asyncProductWriter) Dispatch(ctx context.Context, products []domain.UnifiedProduct) {
+	// Step 1: Fetch existing translations from ES to reuse them.
+	if w.esFetcher != nil {
+		ids := make([]string, len(products))
+		for i, p := range products {
+			ids[i] = p.ID
+		}
+		existing, err := w.esFetcher.BulkGetTranslations(ctx, ids)
+		if err == nil && len(existing) > 0 {
+			for i := range products {
+				tr, ok := existing[products[i].ID]
+				if !ok {
+					continue
+				}
+				// Merge existing translations into the product.
+				if products[i].TitleTranslated == nil {
+					products[i].TitleTranslated = make(map[string]string)
+				}
+				for lang, text := range tr.TitleTranslated {
+					products[i].TitleTranslated[lang] = text
+				}
+				if products[i].DescTranslated == nil {
+					products[i].DescTranslated = make(map[string]string)
+				}
+				for lang, text := range tr.DescTranslated {
+					products[i].DescTranslated[lang] = text
+				}
+			}
+		}
+	}
+
+	// Step 2: Only translate products/languages missing translations.
 	if w.translateSink != nil {
 		w.translateSink.Enrich(ctx, products)
 	}
+
+	// Step 3: Write to ES with complete translations.
 	w.router.Dispatch(ctx, products)
 }

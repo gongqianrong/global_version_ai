@@ -5,18 +5,22 @@ import (
 	"net/http"
 
 	"github.com/rakutao/collection-gateway/internal/i18n"
+	"github.com/rakutao/collection-gateway/internal/search"
 )
 
 // PlatformSearchHandler handles direct platform search requests (bypasses ES).
 type PlatformSearchHandler struct {
 	platformService *PlatformSearchService
 	productWriter   ProductWriter
+	esFetcher       *search.ESProductFetcher
 }
 
 // NewPlatformSearchHandler creates a PlatformSearchHandler.
 // pw (ProductWriter) is optional; if nil, search results are not persisted.
-func NewPlatformSearchHandler(ps *PlatformSearchService, pw ProductWriter) *PlatformSearchHandler {
-	return &PlatformSearchHandler{platformService: ps, productWriter: pw}
+// esFetcher is optional; if set, existing translations are loaded from ES
+// so that the user sees translated titles immediately.
+func NewPlatformSearchHandler(ps *PlatformSearchService, pw ProductWriter, esf *search.ESProductFetcher) *PlatformSearchHandler {
+	return &PlatformSearchHandler{platformService: ps, productWriter: pw, esFetcher: esf}
 }
 
 // HandleSearch handles GET /api/v1/platform/search.
@@ -39,6 +43,29 @@ func (h *PlatformSearchHandler) HandleSearch(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		ErrorWithCode(w, r, http.StatusServiceUnavailable, 50003, err.Error())
 		return
+	}
+
+	// Load existing translations from ES so user sees them immediately.
+	if h.esFetcher != nil && len(summaries) > 0 {
+		ids := make([]string, len(summaries))
+		for i, s := range summaries {
+			ids[i] = s.ID
+		}
+		existing, err := h.esFetcher.BulkGetTranslations(r.Context(), ids)
+		if err == nil && len(existing) > 0 {
+			lang := query.UserLang
+			for i := range summaries {
+				if summaries[i].IsTranslated {
+					continue // already has translation
+				}
+				if tr, ok := existing[summaries[i].ID]; ok {
+					if t, ok := tr.TitleTranslated[lang]; ok && t != "" {
+						summaries[i].Title = t
+						summaries[i].IsTranslated = true
+					}
+				}
+			}
+		}
 	}
 
 	// Async write full products to ES.

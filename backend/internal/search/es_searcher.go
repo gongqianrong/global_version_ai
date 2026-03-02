@@ -96,30 +96,29 @@ type esStatsAgg struct {
 
 // esDocument represents a document stored in the ES index.
 type esDocument struct {
-	ID             string   `json:"id"`
-	SourcePlatform string   `json:"source_platform"`
-	Status         string   `json:"status"`
-	Title          string   `json:"title"`
-	TitleEN        string   `json:"title_en"`
-	TitleZHTW      string   `json:"title_zh_tw"`
-	Description    string   `json:"description"`
-	BrandID        string   `json:"brand_id"`
-	BrandName      string   `json:"brand_name"`
-	BrandNameJA    string   `json:"brand_name_ja"`
-	Categories     []string `json:"categories"`
-	Tags           []string `json:"tags"`
-	Condition      string   `json:"condition"`
-	ContentRating  string   `json:"content_rating"`
-	PriceJPY       int64    `json:"price_jpy"`
-	ServiceFeeJPY  int64    `json:"service_fee_jpy"`
-	OriginalPrice  int64    `json:"original_price"`
-	ShippingType   string   `json:"shipping_type"`
-	SellerID       string   `json:"seller_id"`
-	SellerRating   float64  `json:"seller_rating"`
-	Images         []string `json:"images"`
-	ListedAt       string   `json:"listed_at"`
-	CollectedAt    string   `json:"collected_at"`
-	UpdatedAt      string   `json:"updated_at"`
+	ID              string            `json:"id"`
+	SourcePlatform  string            `json:"source_platform"`
+	Status          string            `json:"status"`
+	Title           string            `json:"title"`
+	TitleTranslated map[string]string `json:"title_translated,omitempty"`
+	Description     string            `json:"description"`
+	BrandID         string            `json:"brand_id"`
+	BrandName       string            `json:"brand_name"`
+	BrandNameJA     string            `json:"brand_name_ja"`
+	Categories      []string          `json:"categories"`
+	Tags            []string          `json:"tags"`
+	Condition       string            `json:"condition"`
+	ContentRating   string            `json:"content_rating"`
+	PriceJPY        int64             `json:"price_jpy"`
+	ServiceFeeJPY   int64             `json:"service_fee_jpy"`
+	OriginalPrice   int64             `json:"original_price"`
+	ShippingType    string            `json:"shipping_type"`
+	SellerID        string            `json:"seller_id"`
+	SellerRating    float64           `json:"seller_rating"`
+	Images          []string          `json:"images"`
+	ListedAt        string            `json:"listed_at"`
+	CollectedAt     string            `json:"collected_at"`
+	UpdatedAt       string            `json:"updated_at"`
 }
 
 // mapSearchResponse converts an ES response to a domain SearchResponse.
@@ -151,17 +150,9 @@ func mapDocToSummary(doc esDocument, userLang string) domain.ProductSummary {
 	title := doc.Title
 	isTranslated := false
 
-	switch userLang {
-	case "zh-TW":
-		if doc.TitleZHTW != "" {
-			title = doc.TitleZHTW
-			isTranslated = true
-		}
-	case "en":
-		if doc.TitleEN != "" {
-			title = doc.TitleEN
-			isTranslated = true
-		}
+	if t, ok := doc.TitleTranslated[userLang]; ok && t != "" {
+		title = t
+		isTranslated = true
 	}
 
 	var image string
@@ -249,4 +240,72 @@ func (f *ESProductFetcher) GetProduct(ctx context.Context, id string) (*domain.U
 type esGetResponse struct {
 	Found  bool            `json:"found"`
 	Source json.RawMessage `json:"_source"`
+}
+
+// BulkGetTranslations fetches existing translations for a batch of product IDs
+// from Elasticsearch using the mget API. Returns a map of productID → translations.
+// Products not found in ES are omitted from the result.
+func (f *ESProductFetcher) BulkGetTranslations(ctx context.Context, ids []string) (map[string]domain.ProductTranslations, error) {
+	if len(ids) == 0 || f.client == nil {
+		return nil, nil
+	}
+
+	type mgetDoc struct {
+		ID    string `json:"_id"`
+		Index string `json:"_index"`
+	}
+	type mgetRequest struct {
+		Docs []mgetDoc `json:"docs"`
+	}
+
+	docs := make([]mgetDoc, len(ids))
+	for i, id := range ids {
+		docs[i] = mgetDoc{ID: id, Index: f.indexName}
+	}
+	body, _ := json.Marshal(mgetRequest{Docs: docs})
+
+	res, err := f.client.Mget(
+		bytes.NewReader(body),
+		f.client.Mget.WithContext(ctx),
+		f.client.Mget.WithSourceIncludes("title_translated", "desc_translated"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("es mget: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return nil, fmt.Errorf("es mget: status %s", res.Status())
+	}
+
+	data, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("es mget: read body: %w", err)
+	}
+
+	var mgetResp struct {
+		Docs []struct {
+			ID     string          `json:"_id"`
+			Found  bool            `json:"found"`
+			Source json.RawMessage `json:"_source"`
+		} `json:"docs"`
+	}
+	if err := json.Unmarshal(data, &mgetResp); err != nil {
+		return nil, fmt.Errorf("es mget: decode: %w", err)
+	}
+
+	result := make(map[string]domain.ProductTranslations, len(mgetResp.Docs))
+	for _, doc := range mgetResp.Docs {
+		if !doc.Found || doc.Source == nil {
+			continue
+		}
+		var tr domain.ProductTranslations
+		if err := json.Unmarshal(doc.Source, &tr); err != nil {
+			continue
+		}
+		if len(tr.TitleTranslated) > 0 || len(tr.DescTranslated) > 0 {
+			result[doc.ID] = tr
+		}
+	}
+	return result, nil
 }
