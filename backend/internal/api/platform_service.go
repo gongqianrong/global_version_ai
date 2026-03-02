@@ -54,8 +54,8 @@ func (s *PlatformSearchService) SearchPlatform(ctx context.Context, platformID s
 			TitleOriginal: product.Title,
 			PriceJPY:      product.PriceJPY,
 			Platform:      product.SourcePlatform,
-			Status:        i18n.StatusLabel(product.Status, lang),
-			Condition:     i18n.ConditionLabel(product.Condition, lang),
+			Status:        product.Status,
+			Condition:     product.Condition,
 		}
 		if t, ok := product.TitleTranslated[string(lang)]; ok && t != "" {
 			summary.Title = t
@@ -130,8 +130,8 @@ func (s *PlatformSearchService) SearchPlatformFull(ctx context.Context, platform
 			TitleOriginal: product.Title,
 			PriceJPY:      product.PriceJPY,
 			Platform:      product.SourcePlatform,
-			Status:        i18n.StatusLabel(product.Status, lang),
-			Condition:     i18n.ConditionLabel(product.Condition, lang),
+			Status:        product.Status,
+			Condition:     product.Condition,
 		}
 		if t, ok := product.TitleTranslated[string(lang)]; ok && t != "" {
 			summary.Title = t

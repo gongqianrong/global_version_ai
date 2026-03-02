@@ -227,27 +227,27 @@ func TestBuildProductResponse_I18N(t *testing.T) {
 	}
 
 	resp := buildProductResponse(p, i18n.LangEN)
-	if resp.Status != "Available" {
-		t.Errorf("status = %q, want Available", resp.Status)
+	if resp.Status != "available" {
+		t.Errorf("status = %q, want available", resp.Status)
 	}
-	if resp.Condition != "New" {
-		t.Errorf("condition = %q, want New", resp.Condition)
+	if resp.Condition != "new" {
+		t.Errorf("condition = %q, want new", resp.Condition)
 	}
 	if resp.Title != "Test Product" {
 		t.Errorf("title = %q, want Test Product", resp.Title)
 	}
-	if resp.ShippingType != "Free Shipping" {
-		t.Errorf("shipping_type = %q, want Free Shipping", resp.ShippingType)
+	if resp.ShippingType != "free" {
+		t.Errorf("shipping_type = %q, want free", resp.ShippingType)
 	}
-	if resp.ContentRating != "General" {
-		t.Errorf("content_rating = %q, want General", resp.ContentRating)
+	if resp.ContentRating != "general" {
+		t.Errorf("content_rating = %q, want general", resp.ContentRating)
 	}
 
 	respJA := buildProductResponse(p, i18n.LangJA)
 	if respJA.Title != "テスト商品" {
 		t.Errorf("title(ja) = %q, want original", respJA.Title)
 	}
-	if respJA.Status != "販売中" {
-		t.Errorf("status(ja) = %q, want 販売中", respJA.Status)
+	if respJA.Status != "available" {
+		t.Errorf("status(ja) = %q, want available", respJA.Status)
 	}
 }
