@@ -7,12 +7,15 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/longbridgeapp/opencc"
 )
 
 // LibreTranslate implements Translator using a self-hosted LibreTranslate API.
 type LibreTranslate struct {
 	client  *http.Client
 	baseURL string
+	s2t     *opencc.OpenCC // simplified → traditional Chinese converter
 }
 
 // NewLibreTranslate creates a LibreTranslate translator.
@@ -21,7 +24,8 @@ func NewLibreTranslate(baseURL string, client *http.Client) *LibreTranslate {
 	if client == nil {
 		client = &http.Client{Timeout: 15 * time.Second}
 	}
-	return &LibreTranslate{client: client, baseURL: baseURL}
+	s2t, _ := opencc.New("s2t")
+	return &LibreTranslate{client: client, baseURL: baseURL, s2t: s2t}
 }
 
 type libreRequest struct {
@@ -87,6 +91,14 @@ func (lt *LibreTranslate) Translate(ctx context.Context, text, sourceLang, targe
 
 	if result.Error != "" {
 		return "", fmt.Errorf("libretranslate: %s", result.Error)
+	}
+
+	// Convert simplified Chinese to traditional Chinese for zh-TW.
+	if targetLang == "zh-TW" && lt.s2t != nil {
+		converted, err := lt.s2t.Convert(result.TranslatedText)
+		if err == nil {
+			return converted, nil
+		}
 	}
 
 	return result.TranslatedText, nil
