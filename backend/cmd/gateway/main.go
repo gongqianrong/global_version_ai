@@ -123,7 +123,11 @@ func main() {
 	// --- Output pipeline (write search results to ES) ---
 	esSink := output.NewESSink(esClient, esIndexName)
 	outputRouter := output.NewRouter(esSink)
-	translator := translate.NewNoop() // placeholder until real translation API is integrated
+	libreURL := os.Getenv("LIBRETRANSLATE_URL")
+	if libreURL == "" {
+		libreURL = "http://localhost:5000"
+	}
+	translator := translate.NewLibreTranslate(libreURL, nil)
 	translateSink := output.NewTranslateSink(translator)
 	productWriter := &asyncProductWriter{router: outputRouter, translateSink: translateSink}
 

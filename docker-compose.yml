@@ -17,6 +17,7 @@ services:
       - SURUGAYA_API_URL=http://153.231.197.185
       - YAHOO_AUCTION_API_URL=http://yahoo-proxy:3001
       - REDIS_URL=redis://redis:6379
+      - LIBRETRANSLATE_URL=http://libretranslate:5000
     restart: unless-stopped
     deploy:
       resources:
@@ -90,6 +91,24 @@ services:
           -d @/index.json
         echo ""
         echo "Index created successfully."
+
+  libretranslate:
+    image: libretranslate/libretranslate:latest
+    ports:
+      - "5000:5000"
+    environment:
+      - LT_LOAD_ONLY=ja,en,zh
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5000/languages || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
 
   redis:
     image: redis:7-alpine
