@@ -45,8 +45,8 @@ func TestLibreTranslate_Translate_LangMapping(t *testing.T) {
 
 	tr := NewLibreTranslate(server.URL, nil)
 	tr.Translate(context.Background(), "test", "ja", "zh-TW")
-	if gotTarget != "zt" {
-		t.Errorf("zh-TW should map to 'zt', got %q", gotTarget)
+	if gotTarget != "zh-Hans" {
+		t.Errorf("zh-TW should map to 'zh-Hans', got %q", gotTarget)
 	}
 }
 

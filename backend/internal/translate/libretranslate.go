@@ -39,7 +39,7 @@ type libreResponse struct {
 var langMap = map[string]string{
 	"ja":    "ja",
 	"en":    "en",
-	"zh-TW": "zt",
+	"zh-TW": "zh-Hans",
 }
 
 func mapLang(lang string) string {
