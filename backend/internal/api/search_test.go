@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/rakutao/collection-gateway/internal/domain"
+	"github.com/rakutao/collection-gateway/internal/i18n"
 	"github.com/rakutao/collection-gateway/internal/search"
 )
 
@@ -49,7 +50,8 @@ func TestHandleSearch_Success(t *testing.T) {
 	defer sm.Stop()
 	handler := NewSearchHandler(preparer, searcher, sm)
 
-	r := httptest.NewRequest("GET", "/api/v1/search?keyword=gucci&lang=en", nil)
+	r := httptest.NewRequest("GET", "/api/v1/search?keyword=gucci", nil)
+	r = r.WithContext(i18n.WithLang(r.Context(), i18n.LangEN))
 	w := httptest.NewRecorder()
 	handler.HandleSearch(w, r)
 
@@ -160,7 +162,8 @@ func TestParseSearchParams_Defaults(t *testing.T) {
 }
 
 func TestParseSearchParams_AllParams(t *testing.T) {
-	r := httptest.NewRequest("GET", "/search?keyword=gucci&platforms=yahoo_auction,amazon_jp&brand_id=b1&categories=bags,shoes&price_min=1000&price_max=50000&condition=new,good&sort=price_asc&page=3&page_size=50&lang=en&content_rating=all", nil)
+	r := httptest.NewRequest("GET", "/search?keyword=gucci&platforms=yahoo_auction,amazon_jp&brand_id=b1&categories=bags,shoes&price_min=1000&price_max=50000&condition=new,good&sort=price_asc&page=3&page_size=50&content_rating=all", nil)
+	r = r.WithContext(i18n.WithLang(r.Context(), i18n.LangEN))
 	q := parseSearchParams(r)
 
 	if q.Keyword != "gucci" {

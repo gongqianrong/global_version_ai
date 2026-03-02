@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rakutao/collection-gateway/internal/domain"
+	"github.com/rakutao/collection-gateway/internal/i18n"
 )
 
 // ProductFetcher retrieves a product by its unified ID.
@@ -44,10 +45,7 @@ func (h *ProductHandler) HandleGetProduct(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	lang := r.URL.Query().Get("lang")
-	if lang == "" {
-		lang = "zh-TW"
-	}
+	lang := i18n.FromContext(r.Context())
 
 	resp := buildProductResponse(product, lang)
 	Success(w, r, resp)
@@ -80,17 +78,18 @@ type ProductResponse struct {
 }
 
 // buildProductResponse maps a UnifiedProduct to the API response, selecting
-// the translated title/description for the given language.
-func buildProductResponse(p *domain.UnifiedProduct, lang string) ProductResponse {
+// the translated title/description for the given language and localizing
+// status, condition, shipping, and content rating labels.
+func buildProductResponse(p *domain.UnifiedProduct, lang i18n.Lang) ProductResponse {
 	title := p.Title
 	description := p.Description
 	isTranslated := false
 
-	if t, ok := p.TitleTranslated[lang]; ok && t != "" {
+	if t, ok := p.TitleTranslated[string(lang)]; ok && t != "" {
 		title = t
 		isTranslated = true
 	}
-	if d, ok := p.DescTranslated[lang]; ok && d != "" {
+	if d, ok := p.DescTranslated[string(lang)]; ok && d != "" {
 		description = d
 	}
 
@@ -105,16 +104,16 @@ func buildProductResponse(p *domain.UnifiedProduct, lang string) ProductResponse
 		PriceJPY:            p.PriceJPY,
 		ServiceFeeJPY:       p.ServiceFeeJPY,
 		OriginalPrice:       p.OriginalPrice,
-		ShippingType:        p.ShippingType,
+		ShippingType:        i18n.ShippingLabel(p.ShippingType, lang),
 		ShippingFeeJPY:      p.ShippingFeeJPY,
 		Brand:               p.Brand,
 		Categories:          p.Categories,
-		Condition:           p.Condition,
-		Status:              p.Status,
+		Condition:           i18n.ConditionLabel(p.Condition, lang),
+		Status:              i18n.StatusLabel(p.Status, lang),
 		Quantity:            p.Quantity,
 		Seller:              p.Seller,
 		Variants:            p.Variants,
-		ContentRating:       p.ContentRating,
+		ContentRating:       i18n.ContentRatingLabel(p.ContentRating, lang),
 		ListedAt:            p.ListedAt.Format("2006-01-02T15:04:05Z"),
 		IsTranslated:        isTranslated,
 	}

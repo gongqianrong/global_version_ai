@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/rakutao/collection-gateway/internal/domain"
+	"github.com/rakutao/collection-gateway/internal/i18n"
 	"github.com/rakutao/collection-gateway/internal/search"
 )
 
@@ -89,10 +90,7 @@ func parseSearchParams(r *http.Request) domain.SearchQuery {
 	priceMin, _ := strconv.ParseInt(q.Get("price_min"), 10, 64)
 	priceMax, _ := strconv.ParseInt(q.Get("price_max"), 10, 64)
 
-	lang := q.Get("lang")
-	if lang == "" {
-		lang = "zh-TW"
-	}
+	lang := string(i18n.FromContext(r.Context()))
 
 	contentRating := q.Get("content_rating")
 	if contentRating == "" {

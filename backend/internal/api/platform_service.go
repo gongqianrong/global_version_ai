@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rakutao/collection-gateway/internal/domain"
+	"github.com/rakutao/collection-gateway/internal/i18n"
 	"github.com/rakutao/collection-gateway/internal/normalizer"
 	"github.com/rakutao/collection-gateway/internal/registry"
 )
@@ -38,6 +39,8 @@ func (s *PlatformSearchService) SearchPlatform(ctx context.Context, platformID s
 		return nil, 0, fmt.Errorf("platform service: search %s: %w", platformID, err)
 	}
 
+	lang := i18n.Lang(query.UserLang)
+
 	summaries := make([]domain.ProductSummary, 0, len(result.Products))
 	for _, raw := range result.Products {
 		product, err := s.normalizer.Normalize(platformID, raw)
@@ -51,8 +54,12 @@ func (s *PlatformSearchService) SearchPlatform(ctx context.Context, platformID s
 			TitleOriginal: product.Title,
 			PriceJPY:      product.PriceJPY,
 			Platform:      product.SourcePlatform,
-			Status:        product.Status,
-			Condition:     product.Condition,
+			Status:        i18n.StatusLabel(product.Status, lang),
+			Condition:     i18n.ConditionLabel(product.Condition, lang),
+		}
+		if t, ok := product.TitleTranslated[string(lang)]; ok && t != "" {
+			summary.Title = t
+			summary.IsTranslated = true
 		}
 		if len(product.Images) > 0 {
 			summary.Image = product.Images[0]
@@ -105,6 +112,8 @@ func (s *PlatformSearchService) SearchPlatformFull(ctx context.Context, platform
 		return nil, nil, 0, fmt.Errorf("platform service: search %s: %w", platformID, err)
 	}
 
+	lang := i18n.Lang(query.UserLang)
+
 	summaries := make([]domain.ProductSummary, 0, len(result.Products))
 	fullProducts := make([]domain.UnifiedProduct, 0, len(result.Products))
 	for _, raw := range result.Products {
@@ -121,8 +130,12 @@ func (s *PlatformSearchService) SearchPlatformFull(ctx context.Context, platform
 			TitleOriginal: product.Title,
 			PriceJPY:      product.PriceJPY,
 			Platform:      product.SourcePlatform,
-			Status:        product.Status,
-			Condition:     product.Condition,
+			Status:        i18n.StatusLabel(product.Status, lang),
+			Condition:     i18n.ConditionLabel(product.Condition, lang),
+		}
+		if t, ok := product.TitleTranslated[string(lang)]; ok && t != "" {
+			summary.Title = t
+			summary.IsTranslated = true
 		}
 		if len(product.Images) > 0 {
 			summary.Image = product.Images[0]

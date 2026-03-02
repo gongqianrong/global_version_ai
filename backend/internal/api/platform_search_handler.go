@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"net/http"
+
+	"github.com/rakutao/collection-gateway/internal/i18n"
 )
 
 // PlatformSearchHandler handles direct platform search requests (bypasses ES).
@@ -21,6 +23,7 @@ func NewPlatformSearchHandler(ps *PlatformSearchService, pw ProductWriter) *Plat
 // Required: keyword, platform
 func (h *PlatformSearchHandler) HandleSearch(w http.ResponseWriter, r *http.Request) {
 	query := parseSearchParams(r)
+	query.UserLang = string(i18n.FromContext(r.Context()))
 
 	platform := r.URL.Query().Get("platform")
 	if platform == "" {

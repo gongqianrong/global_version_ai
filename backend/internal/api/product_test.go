@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rakutao/collection-gateway/internal/domain"
+	"github.com/rakutao/collection-gateway/internal/i18n"
 )
 
 type mockProductFetcher struct {
@@ -45,7 +46,8 @@ func TestHandleGetProduct_Success(t *testing.T) {
 	r := chi.NewRouter()
 	r.Get("/products/{id}", handler.HandleGetProduct)
 
-	req := httptest.NewRequest("GET", "/products/yahoo_auction_abc123?lang=zh-TW", nil)
+	req := httptest.NewRequest("GET", "/products/yahoo_auction_abc123", nil)
+	req = req.WithContext(i18n.WithLang(req.Context(), i18n.LangZhTW))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -200,12 +202,52 @@ func TestBuildProductResponse_NoTranslation(t *testing.T) {
 		Title:    "テスト",
 		ListedAt: time.Now(),
 	}
-	resp := buildProductResponse(p, "zh-TW")
+	resp := buildProductResponse(p, i18n.LangZhTW)
 
 	if resp.Title != "テスト" {
 		t.Errorf("title = %q, want original when no translation", resp.Title)
 	}
 	if resp.IsTranslated {
 		t.Error("expected is_translated = false when no translation available")
+	}
+}
+
+func TestBuildProductResponse_I18N(t *testing.T) {
+	p := &domain.UnifiedProduct{
+		Status:          "available",
+		Condition:       "new",
+		ShippingType:    "free",
+		ContentRating:   "general",
+		Title:           "テスト商品",
+		TitleTranslated: map[string]string{"zh-TW": "測試商品", "en": "Test Product"},
+		Description:     "テスト説明",
+		DescTranslated:  map[string]string{"zh-TW": "測試說明", "en": "Test Desc"},
+		Images:          []string{"img.jpg"},
+		ListedAt:        time.Now(),
+	}
+
+	resp := buildProductResponse(p, i18n.LangEN)
+	if resp.Status != "Available" {
+		t.Errorf("status = %q, want Available", resp.Status)
+	}
+	if resp.Condition != "New" {
+		t.Errorf("condition = %q, want New", resp.Condition)
+	}
+	if resp.Title != "Test Product" {
+		t.Errorf("title = %q, want Test Product", resp.Title)
+	}
+	if resp.ShippingType != "Free Shipping" {
+		t.Errorf("shipping_type = %q, want Free Shipping", resp.ShippingType)
+	}
+	if resp.ContentRating != "General" {
+		t.Errorf("content_rating = %q, want General", resp.ContentRating)
+	}
+
+	respJA := buildProductResponse(p, i18n.LangJA)
+	if respJA.Title != "テスト商品" {
+		t.Errorf("title(ja) = %q, want original", respJA.Title)
+	}
+	if respJA.Status != "販売中" {
+		t.Errorf("status(ja) = %q, want 販売中", respJA.Status)
 	}
 }
