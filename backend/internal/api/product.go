@@ -87,20 +87,21 @@ func buildProductResponse(p *domain.UnifiedProduct, lang i18n.Lang) ProductRespo
 	descOriginal := p.Description
 	isTranslated := false
 
-	if t, ok := p.TitleTranslated[string(lang)]; ok && t != "" {
+	langStr := string(lang)
+
+	// All 4 text fields use translated version when available, skip if empty.
+	if t, ok := p.TitleTranslated[langStr]; ok && t != "" {
 		title = t
 		isTranslated = true
 	}
-	if d, ok := p.DescTranslated[string(lang)]; ok && d != "" {
+	if t, ok := p.TitleTranslated[langStr]; ok && t != "" {
+		titleOriginal = t
+	}
+	if d, ok := p.DescTranslated[langStr]; ok && d != "" {
 		description = d
 	}
-
-	// Ensure original fields are never empty when translated version exists.
-	if titleOriginal == "" && title != "" {
-		titleOriginal = title
-	}
-	if descOriginal == "" && description != "" {
-		descOriginal = description
+	if d, ok := p.DescTranslated[langStr]; ok && d != "" {
+		descOriginal = d
 	}
 
 	return ProductResponse{

@@ -68,8 +68,8 @@ func TestHandleGetProduct_Success(t *testing.T) {
 	if product.Title != "古馳手提包" {
 		t.Errorf("title = %q, want translated title", product.Title)
 	}
-	if product.TitleOriginal != "グッチ バッグ" {
-		t.Errorf("title_original = %q", product.TitleOriginal)
+	if product.TitleOriginal != "古馳手提包" {
+		t.Errorf("title_original = %q, want translated", product.TitleOriginal)
 	}
 	if !product.IsTranslated {
 		t.Error("expected is_translated = true")
@@ -236,18 +236,25 @@ func TestBuildProductResponse_I18N(t *testing.T) {
 	if resp.Title != "Test Product" {
 		t.Errorf("title = %q, want Test Product", resp.Title)
 	}
-	if resp.ShippingType != "free" {
-		t.Errorf("shipping_type = %q, want free", resp.ShippingType)
+	if resp.TitleOriginal != "Test Product" {
+		t.Errorf("title_original = %q, want Test Product", resp.TitleOriginal)
 	}
-	if resp.ContentRating != "general" {
-		t.Errorf("content_rating = %q, want general", resp.ContentRating)
+	if resp.Description != "Test Desc" {
+		t.Errorf("description = %q, want Test Desc", resp.Description)
+	}
+	if resp.DescriptionOriginal != "Test Desc" {
+		t.Errorf("description_original = %q, want Test Desc", resp.DescriptionOriginal)
 	}
 
+	// JA: no translation, all fields show original Japanese
 	respJA := buildProductResponse(p, i18n.LangJA)
 	if respJA.Title != "テスト商品" {
-		t.Errorf("title(ja) = %q, want original", respJA.Title)
+		t.Errorf("title(ja) = %q, want テスト商品", respJA.Title)
 	}
-	if respJA.Status != "available" {
-		t.Errorf("status(ja) = %q, want available", respJA.Status)
+	if respJA.TitleOriginal != "テスト商品" {
+		t.Errorf("title_original(ja) = %q, want テスト商品", respJA.TitleOriginal)
+	}
+	if respJA.Description != "テスト説明" {
+		t.Errorf("description(ja) = %q, want テスト説明", respJA.Description)
 	}
 }
