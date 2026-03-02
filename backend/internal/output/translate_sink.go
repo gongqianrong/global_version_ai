@@ -37,11 +37,6 @@ func (s *TranslateSink) Enrich(ctx context.Context, products []domain.UnifiedPro
 			}
 			langStr := string(lang)
 
-			// Skip if already translated
-			if _, ok := p.TitleTranslated[langStr]; ok {
-				continue
-			}
-
 			if p.Title != "" {
 				translated, err := s.translator.Translate(ctx, p.Title, "ja", langStr)
 				if err != nil {
