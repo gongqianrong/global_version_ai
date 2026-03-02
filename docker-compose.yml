@@ -17,7 +17,7 @@ services:
       - SURUGAYA_API_URL=http://153.231.197.185
       - YAHOO_AUCTION_API_URL=http://yahoo-proxy:3001
       - REDIS_URL=redis://redis:6379
-      - GOOGLE_TRANSLATE_API_KEY=${GOOGLE_TRANSLATE_API_KEY:-}
+      - MALL_TRANSLATE_URL=http://cloud.gamestudio.tech/mall-translate
     restart: unless-stopped
     deploy:
       resources:

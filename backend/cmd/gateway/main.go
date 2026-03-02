@@ -123,15 +123,11 @@ func main() {
 	// --- Output pipeline (write search results to ES) ---
 	esSink := output.NewESSink(esClient, esIndexName)
 	outputRouter := output.NewRouter(esSink)
-	googleAPIKey := os.Getenv("GOOGLE_TRANSLATE_API_KEY")
-	var translator translate.Translator
-	if googleAPIKey != "" {
-		translator = translate.NewGoogle(googleAPIKey, nil)
-		log.Printf("  Translator:        Google Translate API")
-	} else {
-		translator = translate.NewNoop()
-		log.Printf("  Translator:        disabled (set GOOGLE_TRANSLATE_API_KEY to enable)")
+	mallTranslateURL := os.Getenv("MALL_TRANSLATE_URL")
+	if mallTranslateURL == "" {
+		mallTranslateURL = "http://cloud.gamestudio.tech/mall-translate"
 	}
+	translator := translate.NewMall(mallTranslateURL, nil)
 	translateSink := output.NewTranslateSink(translator)
 	productWriter := &asyncProductWriter{router: outputRouter, translateSink: translateSink}
 
