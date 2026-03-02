@@ -136,7 +136,7 @@ func main() {
 	realtimeHandler := api.NewRealtimeHandler(streamManager, platformService, platformService, productWriter)
 	productHandler := api.NewProductHandler(esFetcher, platformService, translator, productWriter)
 	healthHandler := api.NewHealthHandler(reg)
-	platformSearchHandler := api.NewPlatformSearchHandler(platformService, productWriter, esFetcher)
+	platformSearchHandler := api.NewPlatformSearchHandler(platformService, productWriter, esFetcher, translator)
 
 	// Surugaya extension handler (direct client access).
 	surugayaAdapter, _ := reg.GetAdapter("surugaya")

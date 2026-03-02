@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rakutao/collection-gateway/internal/domain"
@@ -66,10 +67,9 @@ func (h *ProductHandler) HandleGetProduct(w http.ResponseWriter, r *http.Request
 
 // translateProductIfNeeded translates title and description on-the-fly
 // if the product doesn't have a translation for the given language.
+// Title and description are translated concurrently.
 // Returns true if any new translation was added.
 func (h *ProductHandler) translateProductIfNeeded(ctx context.Context, p *domain.UnifiedProduct, lang string) bool {
-	changed := false
-
 	if p.TitleTranslated == nil {
 		p.TitleTranslated = make(map[string]string)
 	}
@@ -77,26 +77,56 @@ func (h *ProductHandler) translateProductIfNeeded(ctx context.Context, p *domain
 		p.DescTranslated = make(map[string]string)
 	}
 
-	if _, ok := p.TitleTranslated[lang]; !ok && p.Title != "" {
-		translated, err := h.translator.Translate(ctx, p.Title, "ja", lang)
-		if err != nil {
-			log.Printf("[translate] on-the-fly title error for %s→%s: %v", p.ID, lang, err)
-		} else {
+	needTitle := p.Title != ""
+	if _, ok := p.TitleTranslated[lang]; ok {
+		needTitle = false
+	}
+	needDesc := p.Description != ""
+	if _, ok := p.DescTranslated[lang]; ok {
+		needDesc = false
+	}
+
+	if !needTitle && !needDesc {
+		return false
+	}
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	changed := false
+
+	if needTitle {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			translated, err := h.translator.Translate(ctx, p.Title, "ja", lang)
+			if err != nil {
+				log.Printf("[translate] on-the-fly title error for %s→%s: %v", p.ID, lang, err)
+				return
+			}
+			mu.Lock()
 			p.TitleTranslated[lang] = translated
 			changed = true
-		}
+			mu.Unlock()
+		}()
 	}
 
-	if _, ok := p.DescTranslated[lang]; !ok && p.Description != "" {
-		translated, err := h.translator.Translate(ctx, p.Description, "ja", lang)
-		if err != nil {
-			log.Printf("[translate] on-the-fly desc error for %s→%s: %v", p.ID, lang, err)
-		} else {
+	if needDesc {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			translated, err := h.translator.Translate(ctx, p.Description, "ja", lang)
+			if err != nil {
+				log.Printf("[translate] on-the-fly desc error for %s→%s: %v", p.ID, lang, err)
+				return
+			}
+			mu.Lock()
 			p.DescTranslated[lang] = translated
 			changed = true
-		}
+			mu.Unlock()
+		}()
 	}
 
+	wg.Wait()
 	return changed
 }
 
