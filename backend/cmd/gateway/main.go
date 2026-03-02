@@ -123,11 +123,15 @@ func main() {
 	// --- Output pipeline (write search results to ES) ---
 	esSink := output.NewESSink(esClient, esIndexName)
 	outputRouter := output.NewRouter(esSink)
-	libreURL := os.Getenv("LIBRETRANSLATE_URL")
-	if libreURL == "" {
-		libreURL = "http://localhost:5000"
+	googleAPIKey := os.Getenv("GOOGLE_TRANSLATE_API_KEY")
+	var translator translate.Translator
+	if googleAPIKey != "" {
+		translator = translate.NewGoogle(googleAPIKey, nil)
+		log.Printf("  Translator:        Google Translate API")
+	} else {
+		translator = translate.NewNoop()
+		log.Printf("  Translator:        disabled (set GOOGLE_TRANSLATE_API_KEY to enable)")
 	}
-	translator := translate.NewLibreTranslate(libreURL, nil)
 	translateSink := output.NewTranslateSink(translator)
 	productWriter := &asyncProductWriter{router: outputRouter, translateSink: translateSink}
 
