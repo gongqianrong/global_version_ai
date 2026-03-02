@@ -9,6 +9,7 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rakutao/collection-gateway/internal/domain"
+	"github.com/rakutao/collection-gateway/internal/i18n"
 )
 
 // ESSearcher implements the Searcher interface using Elasticsearch.
@@ -168,6 +169,8 @@ func mapDocToSummary(doc esDocument, userLang string) domain.ProductSummary {
 		image = doc.Images[0]
 	}
 
+	lang := i18n.Lang(userLang)
+
 	return domain.ProductSummary{
 		ID:            doc.ID,
 		Title:         title,
@@ -175,9 +178,9 @@ func mapDocToSummary(doc esDocument, userLang string) domain.ProductSummary {
 		Image:         image,
 		PriceJPY:      doc.PriceJPY,
 		Platform:      doc.SourcePlatform,
-		Status:        doc.Status,
+		Status:        i18n.StatusLabel(doc.Status, lang),
 		Brand:         doc.BrandName,
-		Condition:     doc.Condition,
+		Condition:     i18n.ConditionLabel(doc.Condition, lang),
 		Tags:          doc.Tags,
 		IsTranslated:  isTranslated,
 	}

@@ -42,7 +42,7 @@ func Middleware(c *Client) func(http.Handler) http.Handler {
 				return
 			}
 
-			key := cacheKey(r.URL.Path, r.URL.Query())
+			key := cacheKey(r.URL.Path, r.URL.Query(), r.Header.Get("Accept-Language"))
 			fallbackKey := "fallback:" + key[len("cache:"):]
 
 			// Try hot cache lookup.
@@ -136,9 +136,10 @@ func (cw *captureWriter) Write(b []byte) (int, error) {
 	return cw.body.Write(b)
 }
 
-// cacheKey builds a deterministic cache key from path and sorted query parameters.
+// cacheKey builds a deterministic cache key from path, sorted query parameters,
+// and the Accept-Language header value so different languages are cached separately.
 // The "request_id" parameter is excluded.
-func cacheKey(path string, params url.Values) string {
+func cacheKey(path string, params url.Values, acceptLang string) string {
 	filtered := make(url.Values)
 	for k, v := range params {
 		if k == "request_id" {
@@ -172,6 +173,11 @@ func cacheKey(path string, params url.Values) string {
 				first = false
 			}
 		}
+	}
+
+	if acceptLang != "" {
+		sb.WriteString("|lang=")
+		sb.WriteString(acceptLang)
 	}
 
 	return sb.String()

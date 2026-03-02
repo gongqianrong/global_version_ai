@@ -10,7 +10,7 @@ func TestCacheKey_BasicPath(t *testing.T) {
 	got := cacheKey("/api/v1/search", url.Values{
 		"keyword": {"gundam"},
 		"page":    {"1"},
-	})
+	}, "")
 	want := "cache:/api/v1/search?keyword=gundam&page=1"
 	if got != want {
 		t.Errorf("cacheKey = %q, want %q", got, want)
@@ -22,7 +22,7 @@ func TestCacheKey_SortedParams(t *testing.T) {
 		"page":    {"1"},
 		"keyword": {"gundam"},
 		"brand":   {"bandai"},
-	})
+	}, "")
 	want := "cache:/api/v1/search?brand=bandai&keyword=gundam&page=1"
 	if got != want {
 		t.Errorf("cacheKey = %q, want %q", got, want)
@@ -33,7 +33,7 @@ func TestCacheKey_ExcludesRequestID(t *testing.T) {
 	got := cacheKey("/api/v1/search", url.Values{
 		"keyword":    {"gundam"},
 		"request_id": {"abc123"},
-	})
+	}, "")
 	want := "cache:/api/v1/search?keyword=gundam"
 	if got != want {
 		t.Errorf("cacheKey = %q, want %q", got, want)
@@ -41,7 +41,7 @@ func TestCacheKey_ExcludesRequestID(t *testing.T) {
 }
 
 func TestCacheKey_NoParams(t *testing.T) {
-	got := cacheKey("/api/v1/surugaya/discounts", url.Values{})
+	got := cacheKey("/api/v1/surugaya/discounts", url.Values{}, "")
 	want := "cache:/api/v1/surugaya/discounts"
 	if got != want {
 		t.Errorf("cacheKey = %q, want %q", got, want)
@@ -49,12 +49,19 @@ func TestCacheKey_NoParams(t *testing.T) {
 }
 
 func TestCacheKey_ProductWithID(t *testing.T) {
-	got := cacheKey("/api/v1/products/surugaya_663043159", url.Values{
-		"lang": {"zh-TW"},
-	})
-	want := "cache:/api/v1/products/surugaya_663043159?lang=zh-TW"
+	got := cacheKey("/api/v1/products/surugaya_663043159", url.Values{}, "ja")
+	want := "cache:/api/v1/products/surugaya_663043159|lang=ja"
 	if got != want {
 		t.Errorf("cacheKey = %q, want %q", got, want)
+	}
+}
+
+func TestCacheKey_DifferentLangs(t *testing.T) {
+	base := url.Values{"keyword": {"gundam"}}
+	keyZH := cacheKey("/api/v1/search", base, "zh-TW")
+	keyEN := cacheKey("/api/v1/search", base, "en")
+	if keyZH == keyEN {
+		t.Errorf("cache keys should differ for different languages, got %q", keyZH)
 	}
 }
 
