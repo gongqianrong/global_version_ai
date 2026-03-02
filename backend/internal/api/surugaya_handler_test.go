@@ -15,7 +15,7 @@ import (
 func newTestSurugayaHandler(upstream http.HandlerFunc) (*SurugayaHandler, *httptest.Server) {
 	srv := httptest.NewServer(upstream)
 	client := surugaya.NewClient(srv.URL, nil)
-	return NewSurugayaHandler(client), srv
+	return NewSurugayaHandler(client, nil), srv
 }
 
 // mockSurugayaAPI returns a handler that routes surugaya API paths to JSON responses.
@@ -167,7 +167,7 @@ func TestHandleProductReviews_UpstreamError(t *testing.T) {
 	defer srv.Close()
 
 	client := surugaya.NewClient(srv.URL, nil)
-	handler := NewSurugayaHandler(client)
+	handler := NewSurugayaHandler(client, nil)
 
 	r := chi.NewRouter()
 	r.Get("/api/v1/surugaya/products/{id}/reviews", handler.HandleProductReviews)
@@ -304,7 +304,7 @@ func TestHandleUserComments_Defaults(t *testing.T) {
 	defer srv.Close()
 
 	client := surugaya.NewClient(srv.URL, nil)
-	handler := NewSurugayaHandler(client)
+	handler := NewSurugayaHandler(client, nil)
 
 	req := httptest.NewRequest("GET", "/comments?user_id=u1", nil)
 	w := httptest.NewRecorder()

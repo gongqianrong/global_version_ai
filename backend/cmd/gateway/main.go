@@ -140,7 +140,7 @@ func main() {
 
 	// Surugaya extension handler (direct client access).
 	surugayaAdapter, _ := reg.GetAdapter("surugaya")
-	surugayaHandler := api.NewSurugayaHandler(surugayaAdapter.(*surugaya.Adapter).Client())
+	surugayaHandler := api.NewSurugayaHandler(surugayaAdapter.(*surugaya.Adapter).Client(), translator)
 
 	// --- Redis cache ---
 	redisURL := os.Getenv("REDIS_URL")

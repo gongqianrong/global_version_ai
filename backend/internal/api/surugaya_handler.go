@@ -1,21 +1,27 @@
 package api
 
 import (
+	"context"
+	"log"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rakutao/collection-gateway/internal/adapter/surugaya"
+	"github.com/rakutao/collection-gateway/internal/i18n"
+	"github.com/rakutao/collection-gateway/internal/translate"
 )
 
 // SurugayaHandler handles Surugaya-specific extension endpoints.
 type SurugayaHandler struct {
-	client *surugaya.Client
+	client     *surugaya.Client
+	translator translate.Translator
 }
 
 // NewSurugayaHandler creates a SurugayaHandler.
-func NewSurugayaHandler(client *surugaya.Client) *SurugayaHandler {
-	return &SurugayaHandler{client: client}
+func NewSurugayaHandler(client *surugaya.Client, tr translate.Translator) *SurugayaHandler {
+	return &SurugayaHandler{client: client, translator: tr}
 }
 
 // HandleProductReviews handles GET /api/v1/surugaya/products/{id}/reviews.
@@ -30,6 +36,11 @@ func (h *SurugayaHandler) HandleProductReviews(w http.ResponseWriter, r *http.Re
 	if err != nil {
 		ErrorWithCode(w, r, http.StatusServiceUnavailable, 50003, err.Error())
 		return
+	}
+
+	lang := i18n.FromContext(r.Context())
+	if lang != i18n.LangJA && h.translator != nil {
+		h.translateExtendData(r.Context(), data, string(lang))
 	}
 
 	Success(w, r, data)
@@ -108,6 +119,11 @@ func (h *SurugayaHandler) HandleCampaigns(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	lang := i18n.FromContext(r.Context())
+	if lang != i18n.LangJA && h.translator != nil {
+		h.translateCampaignData(r.Context(), data, string(lang))
+	}
+
 	Success(w, r, data)
 }
 
@@ -123,6 +139,11 @@ func (h *SurugayaHandler) HandleCampaignDetail(w http.ResponseWriter, r *http.Re
 	if err != nil {
 		ErrorWithCode(w, r, http.StatusServiceUnavailable, 50003, err.Error())
 		return
+	}
+
+	lang := i18n.FromContext(r.Context())
+	if lang != i18n.LangJA && h.translator != nil {
+		h.translateCampaignDetailData(r.Context(), data, string(lang))
 	}
 
 	Success(w, r, data)
@@ -154,4 +175,84 @@ func (h *SurugayaHandler) HandleSubCategories(w http.ResponseWriter, r *http.Req
 	}
 
 	Success(w, r, data)
+}
+
+// --- translation helpers ---
+
+// translateField is a pointer to a string field that needs translation.
+type translateField struct {
+	ptr *string
+}
+
+// batchTranslateFields concurrently translates all non-empty string fields.
+func (h *SurugayaHandler) batchTranslateFields(ctx context.Context, fields []translateField, lang string) {
+	if len(fields) == 0 {
+		return
+	}
+
+	sem := make(chan struct{}, 10)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	for _, f := range fields {
+		if *f.ptr == "" {
+			continue
+		}
+		wg.Add(1)
+		go func(p *string, original string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			translated, err := h.translator.Translate(ctx, original, "ja", lang)
+			if err != nil {
+				log.Printf("[translate] surugaya field error →%s: %v", lang, err)
+				return
+			}
+			mu.Lock()
+			*p = translated
+			mu.Unlock()
+		}(f.ptr, *f.ptr)
+	}
+
+	wg.Wait()
+}
+
+// translateExtendData translates reviews and similar product names.
+func (h *SurugayaHandler) translateExtendData(ctx context.Context, data *surugaya.ExtendData, lang string) {
+	var fields []translateField
+	for i := range data.Comments {
+		fields = append(fields, translateField{&data.Comments[i].Title})
+		fields = append(fields, translateField{&data.Comments[i].Comment})
+	}
+	for i := range data.OtherList {
+		fields = append(fields, translateField{&data.OtherList[i].Name})
+	}
+	h.batchTranslateFields(ctx, fields, lang)
+}
+
+// translateCampaignData translates campaign titles and details.
+func (h *SurugayaHandler) translateCampaignData(ctx context.Context, data *surugaya.CampaignData, lang string) {
+	var fields []translateField
+	for i := range data.Campaigns {
+		fields = append(fields, translateField{&data.Campaigns[i].Title})
+		fields = append(fields, translateField{&data.Campaigns[i].Detail})
+	}
+	h.batchTranslateFields(ctx, fields, lang)
+}
+
+// translateCampaignDetailData translates campaign detail entries and group items.
+func (h *SurugayaHandler) translateCampaignDetailData(ctx context.Context, data *surugaya.CampaignDetailData, lang string) {
+	var fields []translateField
+	for i := range data.Campaigns {
+		fields = append(fields, translateField{&data.Campaigns[i].Title})
+		fields = append(fields, translateField{&data.Campaigns[i].Desc})
+	}
+	for i := range data.Groups {
+		fields = append(fields, translateField{&data.Groups[i].Title})
+		for j := range data.Groups[i].Items {
+			fields = append(fields, translateField{&data.Groups[i].Items[j].Name})
+		}
+	}
+	h.batchTranslateFields(ctx, fields, lang)
 }
