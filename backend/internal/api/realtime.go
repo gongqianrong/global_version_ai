@@ -19,6 +19,17 @@ type PlatformSearcher interface {
 	SearchPlatform(ctx context.Context, platformID string, query domain.SearchQuery) ([]domain.ProductSummary, int64, error)
 }
 
+// FullPlatformSearcher extends PlatformSearcher to also return full UnifiedProduct data.
+type FullPlatformSearcher interface {
+	PlatformSearcher
+	SearchPlatformFull(ctx context.Context, platformID string, query domain.SearchQuery) ([]domain.ProductSummary, []domain.UnifiedProduct, int64, error)
+}
+
+// ProductWriter persists products to output sinks (e.g. Elasticsearch).
+type ProductWriter interface {
+	Dispatch(ctx context.Context, products []domain.UnifiedProduct)
+}
+
 // PlatformLister lists platforms that support real-time search.
 type PlatformLister interface {
 	RealtimePlatformIDs() []string
@@ -27,16 +38,19 @@ type PlatformLister interface {
 // RealtimeHandler handles WebSocket connections for real-time search results.
 type RealtimeHandler struct {
 	streamManager    *StreamManager
-	platformSearcher PlatformSearcher
+	platformSearcher FullPlatformSearcher
 	platformLister   PlatformLister
+	productWriter    ProductWriter
 }
 
 // NewRealtimeHandler creates a RealtimeHandler with the given dependencies.
-func NewRealtimeHandler(sm *StreamManager, ps PlatformSearcher, pl PlatformLister) *RealtimeHandler {
+// pw (ProductWriter) is optional; if nil, search results are not persisted.
+func NewRealtimeHandler(sm *StreamManager, ps FullPlatformSearcher, pl PlatformLister, pw ProductWriter) *RealtimeHandler {
 	return &RealtimeHandler{
 		streamManager:    sm,
 		platformSearcher: ps,
 		platformLister:   pl,
+		productWriter:    pw,
 	}
 }
 
@@ -115,7 +129,7 @@ func (h *RealtimeHandler) searchPlatforms(stream *Stream) {
 		go func(platformID string) {
 			defer wg.Done()
 
-			products, total, err := h.platformSearcher.SearchPlatform(ctx, platformID, stream.Query)
+			summaries, fullProducts, total, err := h.platformSearcher.SearchPlatformFull(ctx, platformID, stream.Query)
 
 			mu.Lock()
 			searched = append(searched, platformID)
@@ -130,10 +144,15 @@ func (h *RealtimeHandler) searchPlatforms(stream *Stream) {
 				return
 			}
 
+			// Async write full products to ES.
+			if h.productWriter != nil && len(fullProducts) > 0 {
+				go h.productWriter.Dispatch(context.Background(), fullProducts)
+			}
+
 			stream.Events <- StreamEvent{
 				Type:     EventResults,
 				Platform: platformID,
-				Products: products,
+				Products: summaries,
 				Total:    total,
 			}
 		}(pid)

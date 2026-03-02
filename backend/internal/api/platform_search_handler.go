@@ -1,17 +1,20 @@
 package api
 
 import (
+	"context"
 	"net/http"
 )
 
 // PlatformSearchHandler handles direct platform search requests (bypasses ES).
 type PlatformSearchHandler struct {
 	platformService *PlatformSearchService
+	productWriter   ProductWriter
 }
 
 // NewPlatformSearchHandler creates a PlatformSearchHandler.
-func NewPlatformSearchHandler(ps *PlatformSearchService) *PlatformSearchHandler {
-	return &PlatformSearchHandler{platformService: ps}
+// pw (ProductWriter) is optional; if nil, search results are not persisted.
+func NewPlatformSearchHandler(ps *PlatformSearchService, pw ProductWriter) *PlatformSearchHandler {
+	return &PlatformSearchHandler{platformService: ps, productWriter: pw}
 }
 
 // HandleSearch handles GET /api/v1/platform/search.
@@ -29,14 +32,19 @@ func (h *PlatformSearchHandler) HandleSearch(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	products, total, err := h.platformService.SearchPlatform(r.Context(), platform, query)
+	summaries, fullProducts, total, err := h.platformService.SearchPlatformFull(r.Context(), platform, query)
 	if err != nil {
 		ErrorWithCode(w, r, http.StatusServiceUnavailable, 50003, err.Error())
 		return
 	}
 
+	// Async write full products to ES.
+	if h.productWriter != nil && len(fullProducts) > 0 {
+		go h.productWriter.Dispatch(context.Background(), fullProducts)
+	}
+
 	Success(w, r, map[string]interface{}{
-		"products": products,
+		"products": summaries,
 		"total":    total,
 		"platform": platform,
 	})

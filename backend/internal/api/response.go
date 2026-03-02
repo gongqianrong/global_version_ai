@@ -3,6 +3,8 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/rakutao/collection-gateway/internal/i18n"
 )
 
 // APIResponse is the standard JSON envelope for all API responses.
@@ -30,9 +32,11 @@ func Success(w http.ResponseWriter, r *http.Request, data interface{}) {
 
 // ErrorWithCode writes an error JSON response with the given HTTP status and business error code.
 func ErrorWithCode(w http.ResponseWriter, r *http.Request, httpStatus, code int, message string) {
+	lang := i18n.FromContext(r.Context())
+	translated := i18n.ErrorMessage(code, lang)
 	writeJSON(w, httpStatus, APIResponse{
 		Code:      code,
-		Message:   message,
+		Message:   translated,
 		RequestID: getRequestID(r),
 	})
 }

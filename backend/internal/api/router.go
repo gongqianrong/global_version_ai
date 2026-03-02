@@ -25,11 +25,12 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 	// Global middleware
 	r.Use(Recovery)
 	r.Use(RequestID)
+	r.Use(Language)
 	r.Use(Logger)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
+		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization", "Accept-Language"},
 		AllowCredentials: false,
 		MaxAge:           300,
 	}))

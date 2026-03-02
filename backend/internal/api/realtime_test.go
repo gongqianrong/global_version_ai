@@ -32,6 +32,11 @@ func (m *mockPlatformSearcher) SearchPlatform(_ context.Context, platformID stri
 	return products, int64(len(products)), nil
 }
 
+func (m *mockPlatformSearcher) SearchPlatformFull(_ context.Context, platformID string, q domain.SearchQuery) ([]domain.ProductSummary, []domain.UnifiedProduct, int64, error) {
+	summaries, total, err := m.SearchPlatform(nil, platformID, q)
+	return summaries, nil, total, err
+}
+
 type mockPlatformLister struct {
 	ids []string
 }
@@ -45,7 +50,7 @@ func (m *mockPlatformLister) RealtimePlatformIDs() []string {
 func TestRealtimeHandler_StreamNotFound(t *testing.T) {
 	sm := NewStreamManager()
 	defer sm.Stop()
-	handler := NewRealtimeHandler(sm, &mockPlatformSearcher{}, &mockPlatformLister{})
+	handler := NewRealtimeHandler(sm, &mockPlatformSearcher{}, &mockPlatformLister{}, nil)
 
 	// Use chi router to extract URL param
 	r := chi.NewRouter()
@@ -70,7 +75,7 @@ func TestRealtimeHandler_WebSocket_ReceivesResults(t *testing.T) {
 		},
 	}
 	pl := &mockPlatformLister{ids: []string{"yahoo_auction"}}
-	handler := NewRealtimeHandler(sm, ps, pl)
+	handler := NewRealtimeHandler(sm, ps, pl, nil)
 
 	// Create stream
 	streamID := sm.Create(domain.SearchQuery{Keyword: "test", KeywordJA: "テスト"})
@@ -131,7 +136,7 @@ func TestRealtimeHandler_NoPlatforms(t *testing.T) {
 	defer sm.Stop()
 
 	pl := &mockPlatformLister{ids: []string{}}
-	handler := NewRealtimeHandler(sm, &mockPlatformSearcher{}, pl)
+	handler := NewRealtimeHandler(sm, &mockPlatformSearcher{}, pl, nil)
 
 	streamID := sm.Create(domain.SearchQuery{Keyword: "test"})
 

@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/rakutao/collection-gateway/internal/i18n"
 )
 
 func TestSuccess(t *testing.T) {
@@ -48,8 +50,9 @@ func TestErrorWithCode(t *testing.T) {
 	if resp.Code != 40001 {
 		t.Errorf("code = %d, want 40001", resp.Code)
 	}
-	if resp.Message != "keyword blocked" {
-		t.Errorf("message = %q, want %q", resp.Message, "keyword blocked")
+	// Message is now auto-translated; default lang (zh-TW) is used when no lang in context.
+	if resp.Message != "關鍵字被內容政策封鎖" {
+		t.Errorf("message = %q, want zh-TW translation", resp.Message)
 	}
 }
 
@@ -74,5 +77,32 @@ func TestWriteJSON_ContentType(t *testing.T) {
 	want := "application/json; charset=utf-8"
 	if ct != want {
 		t.Errorf("Content-Type = %q, want %q", ct, want)
+	}
+}
+
+func TestErrorWithCode_I18N(t *testing.T) {
+	req := httptest.NewRequest("GET", "/", nil)
+	ctx := i18n.WithLang(req.Context(), i18n.LangJA)
+	req = req.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+	ErrorWithCode(w, req, http.StatusBadRequest, 40002, "missing required parameter: keyword")
+
+	var resp APIResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+	if resp.Message != "必須パラメータが不足しています" {
+		t.Errorf("message = %q, want Japanese translation", resp.Message)
+	}
+}
+
+func TestErrorWithCode_DefaultLang(t *testing.T) {
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+	ErrorWithCode(w, req, http.StatusNotFound, 40401, "product not found")
+
+	var resp APIResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+	if resp.Message != "找不到商品" {
+		t.Errorf("message = %q, want zh-TW translation", resp.Message)
 	}
 }

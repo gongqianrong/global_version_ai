@@ -92,6 +92,50 @@ func (s *PlatformSearchService) GetProduct(ctx context.Context, productID string
 	return product, nil
 }
 
+// SearchPlatformFull is like SearchPlatform but also returns the full UnifiedProduct
+// slice so callers can persist them to Elasticsearch.
+func (s *PlatformSearchService) SearchPlatformFull(ctx context.Context, platformID string, query domain.SearchQuery) ([]domain.ProductSummary, []domain.UnifiedProduct, int64, error) {
+	adapter, err := s.registry.GetAdapter(platformID)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("platform service: %w", err)
+	}
+
+	result, err := adapter.Search(ctx, query)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("platform service: search %s: %w", platformID, err)
+	}
+
+	summaries := make([]domain.ProductSummary, 0, len(result.Products))
+	fullProducts := make([]domain.UnifiedProduct, 0, len(result.Products))
+	for _, raw := range result.Products {
+		product, err := s.normalizer.Normalize(platformID, raw)
+		if err != nil {
+			continue
+		}
+
+		fullProducts = append(fullProducts, *product)
+
+		summary := domain.ProductSummary{
+			ID:            product.ID,
+			Title:         product.Title,
+			TitleOriginal: product.Title,
+			PriceJPY:      product.PriceJPY,
+			Platform:      product.SourcePlatform,
+			Status:        product.Status,
+			Condition:     product.Condition,
+		}
+		if len(product.Images) > 0 {
+			summary.Image = product.Images[0]
+		}
+		if product.Brand != nil {
+			summary.Brand = product.Brand.Name
+		}
+		summaries = append(summaries, summary)
+	}
+
+	return summaries, fullProducts, result.Total, nil
+}
+
 // RealtimePlatformIDs implements PlatformLister.
 // Returns the IDs of all registered platforms that support real-time search.
 func (s *PlatformSearchService) RealtimePlatformIDs() []string {

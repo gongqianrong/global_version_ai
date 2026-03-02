@@ -37,7 +37,7 @@ func TestPlatformSearchHandler_Success(t *testing.T) {
 
 	norm := normalizer.New(nil)
 	svc := NewPlatformSearchService(reg, norm)
-	handler := NewPlatformSearchHandler(svc)
+	handler := NewPlatformSearchHandler(svc, nil)
 
 	req := httptest.NewRequest("GET", "/api/v1/platform/search?keyword=gundam&platform=surugaya", nil)
 	w := httptest.NewRecorder()
@@ -72,7 +72,7 @@ func TestPlatformSearchHandler_Success(t *testing.T) {
 
 func TestPlatformSearchHandler_MissingKeyword(t *testing.T) {
 	svc := NewPlatformSearchService(registry.New(), normalizer.New(nil))
-	handler := NewPlatformSearchHandler(svc)
+	handler := NewPlatformSearchHandler(svc, nil)
 
 	req := httptest.NewRequest("GET", "/api/v1/platform/search?platform=surugaya", nil)
 	w := httptest.NewRecorder()
@@ -91,7 +91,7 @@ func TestPlatformSearchHandler_MissingKeyword(t *testing.T) {
 
 func TestPlatformSearchHandler_MissingPlatform(t *testing.T) {
 	svc := NewPlatformSearchService(registry.New(), normalizer.New(nil))
-	handler := NewPlatformSearchHandler(svc)
+	handler := NewPlatformSearchHandler(svc, nil)
 
 	req := httptest.NewRequest("GET", "/api/v1/platform/search?keyword=gundam", nil)
 	w := httptest.NewRecorder()
@@ -110,7 +110,7 @@ func TestPlatformSearchHandler_MissingPlatform(t *testing.T) {
 
 func TestPlatformSearchHandler_PlatformNotFound(t *testing.T) {
 	svc := NewPlatformSearchService(registry.New(), normalizer.New(nil))
-	handler := NewPlatformSearchHandler(svc)
+	handler := NewPlatformSearchHandler(svc, nil)
 
 	req := httptest.NewRequest("GET", "/api/v1/platform/search?keyword=gundam&platform=nonexistent", nil)
 	w := httptest.NewRecorder()

@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/rakutao/collection-gateway/internal/i18n"
 )
 
 func TestRecovery_NoPanic(t *testing.T) {
@@ -106,5 +108,29 @@ func TestStatusWriter_CapturesStatus(t *testing.T) {
 
 	if sw.status != http.StatusNotFound {
 		t.Errorf("status = %d, want %d", sw.status, http.StatusNotFound)
+	}
+}
+
+func TestLanguageMiddleware(t *testing.T) {
+	handler := Language(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		lang := i18n.FromContext(r.Context())
+		w.Write([]byte(string(lang)))
+	}))
+
+	// With Accept-Language: ja
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Accept-Language", "ja")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Body.String() != "ja" {
+		t.Errorf("got %q, want %q", w.Body.String(), "ja")
+	}
+
+	// Without header — default zh-TW
+	req2 := httptest.NewRequest("GET", "/", nil)
+	w2 := httptest.NewRecorder()
+	handler.ServeHTTP(w2, req2)
+	if w2.Body.String() != "zh-TW" {
+		t.Errorf("got %q, want %q", w2.Body.String(), "zh-TW")
 	}
 }

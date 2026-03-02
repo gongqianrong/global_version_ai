@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/rakutao/collection-gateway/internal/i18n"
 )
 
 // Recovery catches panics in handlers, logs them, and returns a 500 error.
@@ -58,4 +60,13 @@ func generateID() string {
 	b := make([]byte, 8)
 	rand.Read(b)
 	return fmt.Sprintf("%x", b)
+}
+
+// Language parses the Accept-Language header and stores the resolved language in the request context.
+func Language(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		lang := i18n.FromRequest(r)
+		ctx := i18n.WithLang(r.Context(), lang)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
