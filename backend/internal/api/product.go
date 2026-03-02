@@ -82,7 +82,9 @@ type ProductResponse struct {
 // status, condition, shipping, and content rating labels.
 func buildProductResponse(p *domain.UnifiedProduct, lang i18n.Lang) ProductResponse {
 	title := p.Title
+	titleOriginal := p.Title
 	description := p.Description
+	descOriginal := p.Description
 	isTranslated := false
 
 	if t, ok := p.TitleTranslated[string(lang)]; ok && t != "" {
@@ -93,13 +95,21 @@ func buildProductResponse(p *domain.UnifiedProduct, lang i18n.Lang) ProductRespo
 		description = d
 	}
 
+	// Ensure original fields are never empty when translated version exists.
+	if titleOriginal == "" && title != "" {
+		titleOriginal = title
+	}
+	if descOriginal == "" && description != "" {
+		descOriginal = description
+	}
+
 	return ProductResponse{
 		ID:                  p.ID,
 		Platform:            p.SourcePlatform,
 		Title:               title,
-		TitleOriginal:       p.Title,
+		TitleOriginal:       titleOriginal,
 		Description:         description,
-		DescriptionOriginal: p.Description,
+		DescriptionOriginal: descOriginal,
 		Images:              p.Images,
 		PriceJPY:            p.PriceJPY,
 		ServiceFeeJPY:       p.ServiceFeeJPY,

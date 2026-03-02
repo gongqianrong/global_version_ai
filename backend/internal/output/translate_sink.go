@@ -37,27 +37,24 @@ func (s *TranslateSink) Enrich(ctx context.Context, products []domain.UnifiedPro
 			}
 			langStr := string(lang)
 
-			// Skip if already translated (reused from ES).
-			if _, ok := p.TitleTranslated[langStr]; ok {
-				continue
-			}
-
-			if p.Title != "" {
+			// Translate title if not already translated and not empty.
+			if _, ok := p.TitleTranslated[langStr]; !ok && p.Title != "" {
 				translated, err := s.translator.Translate(ctx, p.Title, "ja", langStr)
 				if err != nil {
 					log.Printf("[translate] title error for %s→%s: %v", p.ID, langStr, err)
-					continue
+				} else {
+					p.TitleTranslated[langStr] = translated
 				}
-				p.TitleTranslated[langStr] = translated
 			}
 
-			if p.Description != "" {
+			// Translate description if not already translated and not empty.
+			if _, ok := p.DescTranslated[langStr]; !ok && p.Description != "" {
 				translated, err := s.translator.Translate(ctx, p.Description, "ja", langStr)
 				if err != nil {
 					log.Printf("[translate] desc error for %s→%s: %v", p.ID, langStr, err)
-					continue
+				} else {
+					p.DescTranslated[langStr] = translated
 				}
-				p.DescTranslated[langStr] = translated
 			}
 		}
 	}
