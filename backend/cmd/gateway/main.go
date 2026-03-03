@@ -18,6 +18,7 @@ import (
 	"github.com/rakutao/collection-gateway/internal/brand"
 	"github.com/rakutao/collection-gateway/internal/cache"
 	"github.com/rakutao/collection-gateway/internal/db"
+	"github.com/rakutao/collection-gateway/internal/email"
 	"github.com/rakutao/collection-gateway/internal/domain"
 	"github.com/rakutao/collection-gateway/internal/filter"
 	"github.com/rakutao/collection-gateway/internal/normalizer"
@@ -145,10 +146,51 @@ func main() {
 	surugayaAdapter, _ := reg.GetAdapter("surugaya")
 	surugayaHandler := api.NewSurugayaHandler(surugayaAdapter.(*surugaya.Adapter).Client(), translator)
 
-	// --- PostgreSQL + JWT + Auth/Cart/Favorite handlers ---
+	// --- Redis cache ---
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		redisURL = "redis://localhost:6379"
+	}
+
+	var cacheMiddleware func(http.Handler) http.Handler
+	cacheClient, err := cache.New(redisURL)
+	if err != nil {
+		log.Printf("WARNING: Redis cache disabled (invalid URL): %v", err)
+	} else {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		if pingErr := cacheClient.Ping(ctx); pingErr != nil {
+			log.Printf("WARNING: Redis not reachable, caching disabled: %v", pingErr)
+			cacheClient = nil
+		} else {
+			cacheMiddleware = cache.Middleware(cacheClient)
+		}
+		cancel()
+	}
+	if cacheClient != nil {
+		defer cacheClient.Close()
+	}
+
+	// --- SMTP email sender ---
+	var emailSender *email.Sender
+	smtpHost := os.Getenv("SMTP_HOST")
+	smtpPort := os.Getenv("SMTP_PORT")
+	smtpUser := os.Getenv("SMTP_USER")
+	smtpPass := os.Getenv("SMTP_PASS")
+	if smtpHost != "" && smtpUser != "" && smtpPass != "" {
+		if smtpPort == "" {
+			smtpPort = "587"
+		}
+		emailSender = email.NewSender(smtpHost, smtpPort, smtpUser, smtpPass)
+		log.Printf("  SMTP:              %s:%s", smtpHost, smtpPort)
+	} else {
+		log.Printf("  SMTP:              disabled (SMTP_HOST/USER/PASS not set)")
+	}
+
+	// --- PostgreSQL + JWT + Auth/Cart/Favorite/OAuth handlers ---
 	var (
 		jwtManager      *auth.JWTManager
 		authHandler     *api.AuthHandler
+		oauthHandler    *api.OAuthHandler
 		cartHandler     *api.CartHandler
 		favoriteHandler *api.FavoriteHandler
 	)
@@ -178,35 +220,20 @@ func main() {
 		cartRepo := repo.NewCartRepo(pgDB)
 		favRepo := repo.NewFavoriteRepo(pgDB)
 
-		authHandler = api.NewAuthHandler(userRepo, jwtManager)
+		authHandler = api.NewAuthHandler(userRepo, jwtManager, cacheClient, emailSender)
 		cartHandler = api.NewCartHandler(cartRepo, esFetcher, translator)
 		favoriteHandler = api.NewFavoriteHandler(favRepo, esFetcher, translator)
+
+		// OAuth (Google + Apple)
+		oauthRepo := repo.NewOAuthRepo(pgDB)
+		googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
+		appleBundleID := os.Getenv("APPLE_BUNDLE_ID")
+		if googleClientID != "" || appleBundleID != "" {
+			oauthHandler = api.NewOAuthHandler(userRepo, oauthRepo, jwtManager, googleClientID, appleBundleID)
+			log.Printf("  OAuth:             enabled (google=%v, apple=%v)", googleClientID != "", appleBundleID != "")
+		}
 	} else {
 		log.Printf("  PostgreSQL:        disabled (DATABASE_URL or JWT_SECRET not set)")
-	}
-
-	// --- Redis cache ---
-	redisURL := os.Getenv("REDIS_URL")
-	if redisURL == "" {
-		redisURL = "redis://localhost:6379"
-	}
-
-	var cacheMiddleware func(http.Handler) http.Handler
-	cacheClient, err := cache.New(redisURL)
-	if err != nil {
-		log.Printf("WARNING: Redis cache disabled (invalid URL): %v", err)
-	} else {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		if pingErr := cacheClient.Ping(ctx); pingErr != nil {
-			log.Printf("WARNING: Redis not reachable, caching disabled: %v", pingErr)
-			cacheClient = nil
-		} else {
-			cacheMiddleware = cache.Middleware(cacheClient)
-		}
-		cancel()
-	}
-	if cacheClient != nil {
-		defer cacheClient.Close()
 	}
 
 	// --- Build router ---
@@ -218,6 +245,7 @@ func main() {
 		PlatformSearchHandler: platformSearchHandler,
 		SurugayaHandler:       surugayaHandler,
 		AuthHandler:           authHandler,
+		OAuthHandler:          oauthHandler,
 		CartHandler:           cartHandler,
 		FavoriteHandler:       favoriteHandler,
 		JWTManager:            jwtManager,

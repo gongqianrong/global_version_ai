@@ -22,6 +22,12 @@ services:
       - MALL_TRANSLATE_URL=http://cloud.gamestudio.tech/mall-translate
       - DATABASE_URL=postgres://rakutao:rakutao@postgres:5432/rakutao?sslmode=disable
       - JWT_SECRET=change-me-to-a-random-secret-in-production
+      - SMTP_HOST=mail.rakutao.vip
+      - SMTP_PORT=587
+      - SMTP_USER=dev-noti@rakutao.vip
+      - SMTP_PASS=ciKqfxpTGM
+      - GOOGLE_CLIENT_ID=placeholder
+      - APPLE_BUNDLE_ID=placeholder
     restart: unless-stopped
     deploy:
       resources:

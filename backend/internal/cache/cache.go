@@ -40,6 +40,11 @@ func (c *Client) Set(ctx context.Context, key string, data []byte, ttl time.Dura
 	return c.rdb.Set(ctx, key, data, ttl).Err()
 }
 
+// Del deletes a key from Redis.
+func (c *Client) Del(ctx context.Context, key string) error {
+	return c.rdb.Del(ctx, key).Err()
+}
+
 // Close closes the underlying Redis connection.
 func (c *Client) Close() error {
 	return c.rdb.Close()

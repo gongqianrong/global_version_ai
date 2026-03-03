@@ -17,6 +17,7 @@ type RouterConfig struct {
 	PlatformSearchHandler *PlatformSearchHandler
 	SurugayaHandler       *SurugayaHandler
 	AuthHandler           *AuthHandler
+	OAuthHandler          *OAuthHandler
 	CartHandler           *CartHandler
 	FavoriteHandler       *FavoriteHandler
 	JWTManager            *auth.JWTManager
@@ -70,10 +71,17 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 		})
 
 		// --- Auth endpoints (public, no cache) ---
-		if cfg.AuthHandler != nil {
+		if cfg.AuthHandler != nil || cfg.OAuthHandler != nil {
 			r.Route("/auth", func(r chi.Router) {
-				r.Post("/register", cfg.AuthHandler.HandleRegister)
-				r.Post("/login", cfg.AuthHandler.HandleLogin)
+				if cfg.AuthHandler != nil {
+					r.Post("/send-code", cfg.AuthHandler.HandleSendCode)
+					r.Post("/register", cfg.AuthHandler.HandleRegister)
+					r.Post("/login", cfg.AuthHandler.HandleLogin)
+				}
+				if cfg.OAuthHandler != nil {
+					r.Post("/google", cfg.OAuthHandler.HandleGoogle)
+					r.Post("/apple", cfg.OAuthHandler.HandleApple)
+				}
 			})
 		}
 

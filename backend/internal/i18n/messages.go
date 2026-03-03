@@ -50,6 +50,31 @@ var errorMessages = map[int]langMessages{
 		LangJA:   "このメールアドレスは既に登録されています",
 		LangZhTW: "電子郵件已被註冊",
 	},
+	40004: {
+		LangEN:   "invalid email format",
+		LangJA:   "メールアドレスの形式が無効です",
+		LangZhTW: "電子郵件格式無效",
+	},
+	40005: {
+		LangEN:   "please wait before requesting another code",
+		LangJA:   "再送信までお待ちください",
+		LangZhTW: "請稍後再請求驗證碼",
+	},
+	40006: {
+		LangEN:   "invalid or expired verification code",
+		LangJA:   "認証コードが無効または期限切れです",
+		LangZhTW: "驗證碼無效或已過期",
+	},
+	40007: {
+		LangEN:   "invalid OAuth token",
+		LangJA:   "OAuthトークンが無効です",
+		LangZhTW: "無效的 OAuth 令牌",
+	},
+	40008: {
+		LangEN:   "OAuth provider error",
+		LangJA:   "OAuthプロバイダーエラー",
+		LangZhTW: "OAuth 提供者錯誤",
+	},
 }
 
 // unknownError holds the fallback message for unmapped error codes.
