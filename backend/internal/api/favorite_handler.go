@@ -109,12 +109,14 @@ func (h *FavoriteHandler) HandleListFavorites(w http.ResponseWriter, r *http.Req
 			if t, ok := product.TitleTranslated[langStr]; ok && t != "" {
 				resp.Title = t
 				resp.IsTranslated = true
-			} else if lang != i18n.LangJA && h.translator != nil && product.Title != "" {
-				if translated, err := h.translator.Translate(r.Context(), product.Title, "ja", langStr); err == nil {
-					resp.Title = translated
-					resp.IsTranslated = true
-				}
 			}
+			// TODO: on-the-fly translation disabled for performance
+			// else if lang != i18n.LangJA && h.translator != nil && product.Title != "" {
+			// 	if translated, err := h.translator.Translate(r.Context(), product.Title, "ja", langStr); err == nil {
+			// 		resp.Title = translated
+			// 		resp.IsTranslated = true
+			// 	}
+			// }
 
 			results[i] = resp
 		}(idx, fi)
