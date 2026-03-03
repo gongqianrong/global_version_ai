@@ -26,7 +26,7 @@ services:
       - SMTP_PORT=587
       - SMTP_USER=dev-noti@rakutao.vip
       - SMTP_PASS=ciKqfxpTGM
-      - GOOGLE_CLIENT_ID=placeholder
+      - GOOGLE_CLIENT_ID=358687166908-pp8q17uu638a4boh8lptvhv34q94qp2a.apps.googleusercontent.com
       - APPLE_BUNDLE_ID=placeholder
     restart: unless-stopped
     deploy:
