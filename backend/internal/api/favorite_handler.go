@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
-	"github.com/rakutao/collection-gateway/internal/i18n"
 	"github.com/rakutao/collection-gateway/internal/repo"
 	"github.com/rakutao/collection-gateway/internal/translate"
 )
@@ -67,9 +66,6 @@ func (h *FavoriteHandler) HandleListFavorites(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	lang := i18n.FromContext(r.Context())
-	langStr := string(lang)
-
 	// Enrich with product data concurrently.
 	results := make([]favoriteProductResponse, len(items))
 	var wg sync.WaitGroup
@@ -106,16 +102,10 @@ func (h *FavoriteHandler) HandleListFavorites(w http.ResponseWriter, r *http.Req
 
 			resp.TitleOriginal = product.Title
 			resp.Title = product.Title
-			if t, ok := product.TitleTranslated[langStr]; ok && t != "" {
-				resp.Title = t
-				resp.IsTranslated = true
-			}
-			// TODO: on-the-fly translation disabled for performance
-			// else if lang != i18n.LangJA && h.translator != nil && product.Title != "" {
-			// 	if translated, err := h.translator.Translate(r.Context(), product.Title, "ja", langStr); err == nil {
-			// 		resp.Title = translated
-			// 		resp.IsTranslated = true
-			// 	}
+			// TODO: translation disabled — always return Japanese original
+			// if t, ok := product.TitleTranslated[langStr]; ok && t != "" {
+			// 	resp.Title = t
+			// 	resp.IsTranslated = true
 			// }
 
 			results[i] = resp
