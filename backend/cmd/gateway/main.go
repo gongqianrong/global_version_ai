@@ -14,13 +14,16 @@ import (
 	yahoo "github.com/rakutao/collection-gateway/internal/adapter/yahoo_auction"
 	"github.com/rakutao/collection-gateway/internal/aiclient"
 	"github.com/rakutao/collection-gateway/internal/api"
+	"github.com/rakutao/collection-gateway/internal/auth"
 	"github.com/rakutao/collection-gateway/internal/brand"
 	"github.com/rakutao/collection-gateway/internal/cache"
+	"github.com/rakutao/collection-gateway/internal/db"
 	"github.com/rakutao/collection-gateway/internal/domain"
 	"github.com/rakutao/collection-gateway/internal/filter"
 	"github.com/rakutao/collection-gateway/internal/normalizer"
-	"github.com/rakutao/collection-gateway/internal/registry"
 	"github.com/rakutao/collection-gateway/internal/output"
+	"github.com/rakutao/collection-gateway/internal/registry"
+	"github.com/rakutao/collection-gateway/internal/repo"
 	"github.com/rakutao/collection-gateway/internal/search"
 	"github.com/rakutao/collection-gateway/internal/translate"
 )
@@ -142,6 +145,46 @@ func main() {
 	surugayaAdapter, _ := reg.GetAdapter("surugaya")
 	surugayaHandler := api.NewSurugayaHandler(surugayaAdapter.(*surugaya.Adapter).Client(), translator)
 
+	// --- PostgreSQL + JWT + Auth/Cart/Favorite handlers ---
+	var (
+		jwtManager      *auth.JWTManager
+		authHandler     *api.AuthHandler
+		cartHandler     *api.CartHandler
+		favoriteHandler *api.FavoriteHandler
+	)
+
+	databaseURL := os.Getenv("DATABASE_URL")
+	jwtSecret := os.Getenv("JWT_SECRET")
+
+	if databaseURL != "" && jwtSecret != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		pgDB, err := db.New(ctx, databaseURL)
+		cancel()
+		if err != nil {
+			log.Fatalf("postgres: %v", err)
+		}
+		defer pgDB.Close()
+
+		ctx2, cancel2 := context.WithTimeout(context.Background(), 2*time.Second)
+		if err := pgDB.Ping(ctx2); err != nil {
+			log.Fatalf("postgres ping: %v", err)
+		}
+		cancel2()
+		log.Printf("  PostgreSQL:        connected")
+
+		jwtManager = auth.NewJWTManager(jwtSecret, 72*time.Hour)
+
+		userRepo := repo.NewUserRepo(pgDB)
+		cartRepo := repo.NewCartRepo(pgDB)
+		favRepo := repo.NewFavoriteRepo(pgDB)
+
+		authHandler = api.NewAuthHandler(userRepo, jwtManager)
+		cartHandler = api.NewCartHandler(cartRepo, esFetcher, translator)
+		favoriteHandler = api.NewFavoriteHandler(favRepo, esFetcher, translator)
+	} else {
+		log.Printf("  PostgreSQL:        disabled (DATABASE_URL or JWT_SECRET not set)")
+	}
+
 	// --- Redis cache ---
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
@@ -174,6 +217,10 @@ func main() {
 		HealthHandler:         healthHandler,
 		PlatformSearchHandler: platformSearchHandler,
 		SurugayaHandler:       surugayaHandler,
+		AuthHandler:           authHandler,
+		CartHandler:           cartHandler,
+		FavoriteHandler:       favoriteHandler,
+		JWTManager:            jwtManager,
 		CacheMiddleware:       cacheMiddleware,
 	})
 

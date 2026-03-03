@@ -30,6 +30,26 @@ var errorMessages = map[int]langMessages{
 		LangJA:   "サービスが利用できません",
 		LangZhTW: "服務暫時無法使用",
 	},
+	40003: {
+		LangEN:   "invalid parameter value",
+		LangJA:   "パラメータの値が無効です",
+		LangZhTW: "參數值無效",
+	},
+	40100: {
+		LangEN:   "authentication required",
+		LangJA:   "認証が必要です",
+		LangZhTW: "需要認證",
+	},
+	40101: {
+		LangEN:   "invalid or expired token",
+		LangJA:   "トークンが無効または期限切れです",
+		LangZhTW: "無效或過期的令牌",
+	},
+	40901: {
+		LangEN:   "email already registered",
+		LangJA:   "このメールアドレスは既に登録されています",
+		LangZhTW: "電子郵件已被註冊",
+	},
 }
 
 // unknownError holds the fallback message for unmapped error codes.

@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
+	"github.com/rakutao/collection-gateway/internal/auth"
 )
 
 // RouterConfig holds the dependencies needed to build the API router.
@@ -15,6 +16,10 @@ type RouterConfig struct {
 	HealthHandler         *HealthHandler
 	PlatformSearchHandler *PlatformSearchHandler
 	SurugayaHandler       *SurugayaHandler
+	AuthHandler           *AuthHandler
+	CartHandler           *CartHandler
+	FavoriteHandler       *FavoriteHandler
+	JWTManager            *auth.JWTManager
 	CacheMiddleware       func(http.Handler) http.Handler
 }
 
@@ -40,26 +45,58 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 
 	// API v1
 	r.Route("/api/v1", func(r chi.Router) {
-		if cfg.CacheMiddleware != nil {
-			r.Use(cfg.CacheMiddleware)
+		// --- Public endpoints with cache ---
+		r.Group(func(r chi.Router) {
+			if cfg.CacheMiddleware != nil {
+				r.Use(cfg.CacheMiddleware)
+			}
+
+			r.Get("/search", cfg.SearchHandler.HandleSearch)
+			r.Get("/search/stream/{streamID}", cfg.RealtimeHandler.HandleStream)
+			r.Get("/products/{id}", cfg.ProductHandler.HandleGetProduct)
+			r.Get("/platform/search", cfg.PlatformSearchHandler.HandleSearch)
+
+			// Surugaya extension endpoints.
+			r.Route("/surugaya", func(r chi.Router) {
+				r.Get("/products/{id}/reviews", cfg.SurugayaHandler.HandleProductReviews)
+				r.Get("/products/{id}/stores", cfg.SurugayaHandler.HandleProductStores)
+				r.Get("/discounts", cfg.SurugayaHandler.HandleDiscounts)
+				r.Get("/comments", cfg.SurugayaHandler.HandleUserComments)
+				r.Get("/campaigns", cfg.SurugayaHandler.HandleCampaigns)
+				r.Get("/campaigns/detail", cfg.SurugayaHandler.HandleCampaignDetail)
+				r.Get("/categories", cfg.SurugayaHandler.HandleCategories)
+				r.Get("/categories/{id}", cfg.SurugayaHandler.HandleSubCategories)
+			})
+		})
+
+		// --- Auth endpoints (public, no cache) ---
+		if cfg.AuthHandler != nil {
+			r.Route("/auth", func(r chi.Router) {
+				r.Post("/register", cfg.AuthHandler.HandleRegister)
+				r.Post("/login", cfg.AuthHandler.HandleLogin)
+			})
 		}
 
-		r.Get("/search", cfg.SearchHandler.HandleSearch)
-		r.Get("/search/stream/{streamID}", cfg.RealtimeHandler.HandleStream)
-		r.Get("/products/{id}", cfg.ProductHandler.HandleGetProduct)
-		r.Get("/platform/search", cfg.PlatformSearchHandler.HandleSearch)
+		// --- Protected endpoints (require JWT, no cache) ---
+		if cfg.JWTManager != nil {
+			r.Group(func(r chi.Router) {
+				r.Use(AuthRequired(cfg.JWTManager))
 
-		// Surugaya extension endpoints.
-		r.Route("/surugaya", func(r chi.Router) {
-			r.Get("/products/{id}/reviews", cfg.SurugayaHandler.HandleProductReviews)
-			r.Get("/products/{id}/stores", cfg.SurugayaHandler.HandleProductStores)
-			r.Get("/discounts", cfg.SurugayaHandler.HandleDiscounts)
-			r.Get("/comments", cfg.SurugayaHandler.HandleUserComments)
-			r.Get("/campaigns", cfg.SurugayaHandler.HandleCampaigns)
-			r.Get("/campaigns/detail", cfg.SurugayaHandler.HandleCampaignDetail)
-			r.Get("/categories", cfg.SurugayaHandler.HandleCategories)
-			r.Get("/categories/{id}", cfg.SurugayaHandler.HandleSubCategories)
-		})
+				if cfg.CartHandler != nil {
+					r.Get("/cart", cfg.CartHandler.HandleListCart)
+					r.Post("/cart", cfg.CartHandler.HandleAddToCart)
+					r.Put("/cart/{productID}", cfg.CartHandler.HandleUpdateQuantity)
+					r.Delete("/cart/{productID}", cfg.CartHandler.HandleRemoveFromCart)
+				}
+
+				if cfg.FavoriteHandler != nil {
+					r.Get("/favorites", cfg.FavoriteHandler.HandleListFavorites)
+					r.Post("/favorites/{productID}", cfg.FavoriteHandler.HandleAddFavorite)
+					r.Delete("/favorites/{productID}", cfg.FavoriteHandler.HandleRemoveFavorite)
+					r.Get("/favorites/check", cfg.FavoriteHandler.HandleCheckFavorites)
+				}
+			})
+		}
 	})
 
 	return r
