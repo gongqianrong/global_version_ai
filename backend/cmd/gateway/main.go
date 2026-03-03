@@ -193,6 +193,7 @@ func main() {
 		oauthHandler    *api.OAuthHandler
 		cartHandler     *api.CartHandler
 		favoriteHandler *api.FavoriteHandler
+		sellerHandler   *api.SellerHandler
 	)
 
 	databaseURL := os.Getenv("DATABASE_URL")
@@ -219,10 +220,12 @@ func main() {
 		userRepo := repo.NewUserRepo(pgDB)
 		cartRepo := repo.NewCartRepo(pgDB)
 		favRepo := repo.NewFavoriteRepo(pgDB)
+		sellerFollowRepo := repo.NewSellerFollowRepo(pgDB)
 
 		authHandler = api.NewAuthHandler(userRepo, jwtManager, cacheClient, emailSender)
 		cartHandler = api.NewCartHandler(cartRepo, esFetcher, translator)
 		favoriteHandler = api.NewFavoriteHandler(favRepo, esFetcher, translator)
+		sellerHandler = api.NewSellerHandler(sellerFollowRepo)
 
 		// OAuth (Google + Apple)
 		oauthRepo := repo.NewOAuthRepo(pgDB)
@@ -248,6 +251,7 @@ func main() {
 		OAuthHandler:          oauthHandler,
 		CartHandler:           cartHandler,
 		FavoriteHandler:       favoriteHandler,
+		SellerHandler:         sellerHandler,
 		JWTManager:            jwtManager,
 		CacheMiddleware:       cacheMiddleware,
 	})

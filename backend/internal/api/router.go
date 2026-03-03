@@ -20,6 +20,7 @@ type RouterConfig struct {
 	OAuthHandler          *OAuthHandler
 	CartHandler           *CartHandler
 	FavoriteHandler       *FavoriteHandler
+	SellerHandler         *SellerHandler
 	JWTManager            *auth.JWTManager
 	CacheMiddleware       func(http.Handler) http.Handler
 }
@@ -102,6 +103,13 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 					r.Post("/favorites/{productID}", cfg.FavoriteHandler.HandleAddFavorite)
 					r.Delete("/favorites/{productID}", cfg.FavoriteHandler.HandleRemoveFavorite)
 					r.Get("/favorites/check", cfg.FavoriteHandler.HandleCheckFavorites)
+				}
+
+				if cfg.SellerHandler != nil {
+					r.Post("/sellers/{sellerID}/follow", cfg.SellerHandler.HandleFollow)
+					r.Delete("/sellers/{sellerID}/follow", cfg.SellerHandler.HandleUnfollow)
+					r.Get("/sellers/followed", cfg.SellerHandler.HandleListFollowed)
+					r.Get("/sellers/check", cfg.SellerHandler.HandleCheckFollowed)
 				}
 			})
 		}
