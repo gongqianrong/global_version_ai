@@ -30,9 +30,8 @@ const swaggerHTML = `<!DOCTYPE html>
       deepLinking: true,
       presets: [
         SwaggerUIBundle.presets.apis,
-        SwaggerUIBundle.SwaggerUIStandalonePreset,
       ],
-      layout: 'StandaloneLayout',
+      layout: 'BaseLayout',
     });
   </script>
 </body>
