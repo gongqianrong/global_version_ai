@@ -239,6 +239,22 @@ func main() {
 		orderSvc := service.NewOrderService(esFetcher, walletRepo, orderRepo, cartRepo)
 		orderHandler = api.NewOrderHandler(orderSvc)
 
+		// Background: auto-cancel unpaid orders after 30 minutes.
+		go func() {
+			ticker := time.NewTicker(1 * time.Minute)
+			defer ticker.Stop()
+			for range ticker.C {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				n, err := orderRepo.CancelExpired(ctx, 30*time.Minute)
+				cancel()
+				if err != nil {
+					log.Printf("[order] auto-cancel error: %v", err)
+				} else if n > 0 {
+					log.Printf("[order] auto-cancelled %d expired orders", n)
+				}
+			}
+		}()
+
 		// OAuth (Google + Apple)
 		oauthRepo := repo.NewOAuthRepo(pgDB)
 		googleClientID := os.Getenv("GOOGLE_CLIENT_ID")

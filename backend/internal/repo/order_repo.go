@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/rakutao/collection-gateway/internal/db"
@@ -160,4 +161,19 @@ func (r *OrderRepo) ListByUser(ctx context.Context, userID int64, state, limit, 
 		orders = append(orders, o)
 	}
 	return orders, total, rows.Err()
+}
+
+// CancelExpired cancels all pending orders older than the given timeout.
+// Returns the number of cancelled orders.
+func (r *OrderRepo) CancelExpired(ctx context.Context, timeout time.Duration) (int64, error) {
+	cutoff := time.Now().Add(-timeout)
+	tag, err := r.db.Pool.Exec(ctx,
+		`UPDATE orders SET order_state = $1, updated_at = NOW()
+		 WHERE order_state = $2 AND created_at < $3`,
+		domain.OrderStateCancelled, domain.OrderStatePending, cutoff,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("order_repo: cancel_expired: %w", err)
+	}
+	return tag.RowsAffected(), nil
 }
