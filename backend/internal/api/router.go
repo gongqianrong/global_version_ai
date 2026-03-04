@@ -21,6 +21,8 @@ type RouterConfig struct {
 	CartHandler           *CartHandler
 	FavoriteHandler       *FavoriteHandler
 	SellerHandler         *SellerHandler
+	WalletHandler         *WalletHandler
+	AdminChecker          UserAdminChecker
 	JWTManager            *auth.JWTManager
 	CacheMiddleware       func(http.Handler) http.Handler
 }
@@ -111,6 +113,21 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 					r.Get("/sellers/followed", cfg.SellerHandler.HandleListFollowed)
 					r.Get("/sellers/check", cfg.SellerHandler.HandleCheckFollowed)
 				}
+
+				if cfg.WalletHandler != nil {
+					r.Get("/wallet/balance", cfg.WalletHandler.HandleGetBalance)
+					r.Get("/wallet/transactions", cfg.WalletHandler.HandleListTransactions)
+				}
+			})
+		}
+
+		// --- Admin endpoints (require JWT + admin) ---
+		if cfg.JWTManager != nil && cfg.WalletHandler != nil && cfg.AdminChecker != nil {
+			r.Route("/admin", func(r chi.Router) {
+				r.Use(AuthRequired(cfg.JWTManager))
+				r.Use(AdminRequired(cfg.AdminChecker))
+
+				r.Post("/wallet/adjust", cfg.WalletHandler.HandleAdminAdjust)
 			})
 		}
 	})

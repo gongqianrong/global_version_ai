@@ -194,6 +194,8 @@ func main() {
 		cartHandler     *api.CartHandler
 		favoriteHandler *api.FavoriteHandler
 		sellerHandler   *api.SellerHandler
+		walletHandler   *api.WalletHandler
+		adminChecker    api.UserAdminChecker
 	)
 
 	databaseURL := os.Getenv("DATABASE_URL")
@@ -227,6 +229,10 @@ func main() {
 		favoriteHandler = api.NewFavoriteHandler(favRepo, esFetcher, translator)
 		sellerHandler = api.NewSellerHandler(sellerFollowRepo)
 
+		walletRepo := repo.NewWalletRepo(pgDB)
+		walletHandler = api.NewWalletHandler(walletRepo)
+		adminChecker = walletRepo
+
 		// OAuth (Google + Apple)
 		oauthRepo := repo.NewOAuthRepo(pgDB)
 		googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
@@ -252,6 +258,8 @@ func main() {
 		CartHandler:           cartHandler,
 		FavoriteHandler:       favoriteHandler,
 		SellerHandler:         sellerHandler,
+		WalletHandler:         walletHandler,
+		AdminChecker:          adminChecker,
 		JWTManager:            jwtManager,
 		CacheMiddleware:       cacheMiddleware,
 	})

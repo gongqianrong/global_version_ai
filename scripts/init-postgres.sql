@@ -48,3 +48,26 @@ CREATE TABLE IF NOT EXISTS followed_sellers (
     UNIQUE(user_id, seller_id)
 );
 CREATE INDEX IF NOT EXISTS idx_followed_sellers_user_id ON followed_sellers(user_id);
+
+-- Wallet system
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS wallets (
+    id         BIGSERIAL    PRIMARY KEY,
+    user_id    BIGINT       NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    balance    BIGINT       NOT NULL DEFAULT 0,  -- JPY
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS wallet_transactions (
+    id             BIGSERIAL    PRIMARY KEY,
+    user_id        BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type           VARCHAR(20)  NOT NULL,  -- recharge, purchase, refund, adjustment
+    amount         BIGINT       NOT NULL,  -- positive=credit, negative=debit
+    balance_after  BIGINT       NOT NULL,
+    description    TEXT         NOT NULL DEFAULT '',
+    related_order  VARCHAR(64)  DEFAULT NULL,
+    created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_wallet_tx_user ON wallet_transactions(user_id, created_at DESC);
