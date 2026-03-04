@@ -22,6 +22,7 @@ type RouterConfig struct {
 	FavoriteHandler       *FavoriteHandler
 	SellerHandler         *SellerHandler
 	WalletHandler         *WalletHandler
+	OrderHandler          *OrderHandler
 	AdminChecker          UserAdminChecker
 	JWTManager            *auth.JWTManager
 	CacheMiddleware       func(http.Handler) http.Handler
@@ -31,7 +32,6 @@ type RouterConfig struct {
 func NewRouter(cfg RouterConfig) *chi.Mux {
 	r := chi.NewRouter()
 
-	// Global middleware
 	r.Use(Recovery)
 	r.Use(RequestID)
 	r.Use(Language)
@@ -44,23 +44,19 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 		MaxAge:           300,
 	}))
 
-	// Health check (outside /api/v1 group)
 	r.Get("/health", cfg.HealthHandler.HandleHealth)
 
-	// API v1
 	r.Route("/api/v1", func(r chi.Router) {
-		// --- Public endpoints with cache ---
+		// Public endpoints with cache.
 		r.Group(func(r chi.Router) {
 			if cfg.CacheMiddleware != nil {
 				r.Use(cfg.CacheMiddleware)
 			}
-
 			r.Get("/search", cfg.SearchHandler.HandleSearch)
 			r.Get("/search/stream/{streamID}", cfg.RealtimeHandler.HandleStream)
 			r.Get("/products/{id}", cfg.ProductHandler.HandleGetProduct)
 			r.Get("/platform/search", cfg.PlatformSearchHandler.HandleSearch)
 
-			// Surugaya extension endpoints.
 			r.Route("/surugaya", func(r chi.Router) {
 				r.Get("/products/{id}/reviews", cfg.SurugayaHandler.HandleProductReviews)
 				r.Get("/products/{id}/stores", cfg.SurugayaHandler.HandleProductStores)
@@ -73,7 +69,7 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 			})
 		})
 
-		// --- Auth endpoints (public, no cache) ---
+		// Auth endpoints (public, no cache).
 		if cfg.AuthHandler != nil || cfg.OAuthHandler != nil {
 			r.Route("/auth", func(r chi.Router) {
 				if cfg.AuthHandler != nil {
@@ -88,7 +84,7 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 			})
 		}
 
-		// --- Protected endpoints (require JWT, no cache) ---
+		// Protected endpoints (require JWT).
 		if cfg.JWTManager != nil {
 			r.Group(func(r chi.Router) {
 				r.Use(AuthRequired(cfg.JWTManager))
@@ -118,15 +114,23 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 					r.Get("/wallet/balance", cfg.WalletHandler.HandleGetBalance)
 					r.Get("/wallet/transactions", cfg.WalletHandler.HandleListTransactions)
 				}
+
+				if cfg.OrderHandler != nil {
+					r.Post("/order/settlement", cfg.OrderHandler.HandleSettlement)
+					r.Post("/order/confirm", cfg.OrderHandler.HandleConfirm)
+					r.Post("/order/pay", cfg.OrderHandler.HandlePay)
+					r.Post("/order/cancel", cfg.OrderHandler.HandleCancelOrder)
+					r.Get("/order/{orderNumber}", cfg.OrderHandler.HandleGetOrder)
+					r.Get("/orders", cfg.OrderHandler.HandleListOrders)
+				}
 			})
 		}
 
-		// --- Admin endpoints (require JWT + admin) ---
+		// Admin endpoints (require JWT + admin).
 		if cfg.JWTManager != nil && cfg.WalletHandler != nil && cfg.AdminChecker != nil {
 			r.Route("/admin", func(r chi.Router) {
 				r.Use(AuthRequired(cfg.JWTManager))
 				r.Use(AdminRequired(cfg.AdminChecker))
-
 				r.Post("/wallet/adjust", cfg.WalletHandler.HandleAdminAdjust)
 			})
 		}

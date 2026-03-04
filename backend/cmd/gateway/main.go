@@ -26,6 +26,7 @@ import (
 	"github.com/rakutao/collection-gateway/internal/registry"
 	"github.com/rakutao/collection-gateway/internal/repo"
 	"github.com/rakutao/collection-gateway/internal/search"
+	"github.com/rakutao/collection-gateway/internal/service"
 	"github.com/rakutao/collection-gateway/internal/translate"
 )
 
@@ -195,6 +196,7 @@ func main() {
 		favoriteHandler *api.FavoriteHandler
 		sellerHandler   *api.SellerHandler
 		walletHandler   *api.WalletHandler
+		orderHandler    *api.OrderHandler
 		adminChecker    api.UserAdminChecker
 	)
 
@@ -233,6 +235,10 @@ func main() {
 		walletHandler = api.NewWalletHandler(walletRepo)
 		adminChecker = walletRepo
 
+		orderRepo := repo.NewOrderRepo(pgDB)
+		orderSvc := service.NewOrderService(esFetcher, walletRepo, orderRepo, cartRepo)
+		orderHandler = api.NewOrderHandler(orderSvc)
+
 		// OAuth (Google + Apple)
 		oauthRepo := repo.NewOAuthRepo(pgDB)
 		googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
@@ -259,6 +265,7 @@ func main() {
 		FavoriteHandler:       favoriteHandler,
 		SellerHandler:         sellerHandler,
 		WalletHandler:         walletHandler,
+		OrderHandler:          orderHandler,
 		AdminChecker:          adminChecker,
 		JWTManager:            jwtManager,
 		CacheMiddleware:       cacheMiddleware,
