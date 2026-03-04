@@ -52,6 +52,7 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 	r.Get("/swagger/openapi.yaml", HandleOpenAPISpec)
 	r.Get("/swagger/swagger-ui-bundle.min.js", HandleSwaggerJS)
 	r.Get("/swagger/swagger-ui.min.css", HandleSwaggerCSS)
+	r.Get("/swagger/changelog.json", HandleChangelogJSON)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		// Public endpoints with cache.

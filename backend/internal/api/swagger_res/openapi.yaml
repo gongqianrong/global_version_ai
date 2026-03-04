@@ -25,7 +25,7 @@ info:
     ```
     - `code=0` 表示成功，`data` 包含业务数据
     - `code≠0` 表示错误，`message` 包含错误描述
-  version: "1.0.0"
+  version: "1.1.0"
 
 servers:
   - url: https://api.rakutao.vip

@@ -1,0 +1,68 @@
+{
+  "versions": [
+    {
+      "version": "1.1.0",
+      "date": "2026-03-04",
+      "summary": "Order system, wallet system, and seller follow features",
+      "changes": [
+        {
+          "type": "added",
+          "endpoints": ["POST /api/v1/order/settlement", "POST /api/v1/order/confirm", "POST /api/v1/order/pay", "POST /api/v1/order/cancel", "GET /api/v1/order/{orderNumber}", "GET /api/v1/orders"],
+          "description": "Order system: settlement preview, order creation with wallet deduction, payment, cancellation, and order list with details"
+        },
+        {
+          "type": "added",
+          "endpoints": ["GET /api/v1/wallet/balance", "GET /api/v1/wallet/transactions", "POST /api/v1/admin/wallet/adjust"],
+          "description": "JPY wallet system: balance query, transaction history, and admin balance adjustment"
+        },
+        {
+          "type": "added",
+          "endpoints": ["POST /api/v1/sellers/{sellerID}/follow", "DELETE /api/v1/sellers/{sellerID}/follow", "GET /api/v1/sellers/followed", "GET /api/v1/sellers/check"],
+          "description": "Seller follow/unfollow with pagination and batch check"
+        },
+        {
+          "type": "added",
+          "endpoints": ["POST /api/v1/auth/send-code"],
+          "description": "Email verification code for registration (SMTP, 6-digit code, 10min TTL)"
+        },
+        {
+          "type": "modified",
+          "endpoints": ["GET /api/v1/orders"],
+          "description": "Order list now includes orderDetailList with goodsImg field"
+        }
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-03-03",
+      "summary": "Initial release with search, auth, cart, favorites, and OAuth",
+      "changes": [
+        {
+          "type": "added",
+          "endpoints": ["GET /api/v1/search", "GET /api/v1/products/{id}", "GET /api/v1/platform/search"],
+          "description": "Product search, detail, and platform search endpoints"
+        },
+        {
+          "type": "added",
+          "endpoints": ["POST /api/v1/auth/register", "POST /api/v1/auth/login", "POST /api/v1/auth/google", "POST /api/v1/auth/apple"],
+          "description": "User registration, login, and OAuth (Google/Apple) authentication"
+        },
+        {
+          "type": "added",
+          "endpoints": ["GET /api/v1/cart", "POST /api/v1/cart", "PUT /api/v1/cart/{productID}", "DELETE /api/v1/cart/{productID}"],
+          "description": "Shopping cart with seller grouping and price change detection"
+        },
+        {
+          "type": "added",
+          "endpoints": ["GET /api/v1/favorites", "POST /api/v1/favorites/{productID}", "DELETE /api/v1/favorites/{productID}", "GET /api/v1/favorites/check"],
+          "description": "Favorites with pagination and batch check"
+        },
+        {
+          "type": "added",
+          "endpoints": ["GET /api/v1/surugaya/*"],
+          "description": "Surugaya proxy endpoints: reviews, stores, discounts, comments, campaigns, categories"
+        }
+      ]
+    }
+  ]
+}
