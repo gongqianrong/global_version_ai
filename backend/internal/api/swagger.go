@@ -5,15 +5,15 @@ import (
 	"net/http"
 )
 
-//go:embed swagger_res/openapi.yaml
-var openAPISpec embed.FS
+//go:embed swagger_res/*
+var swaggerRes embed.FS
 
 const swaggerHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>Rakutao API Documentation</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.18.2/swagger-ui.min.css">
+  <link rel="stylesheet" href="./swagger-ui.min.css">
   <style>
     html { box-sizing: border-box; overflow-y: scroll; }
     *, *:before, *:after { box-sizing: inherit; }
@@ -22,7 +22,7 @@ const swaggerHTML = `<!DOCTYPE html>
 </head>
 <body>
   <div id="swagger-ui"></div>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.18.2/swagger-ui-bundle.min.js"></script>
+  <script src="./swagger-ui-bundle.min.js"></script>
   <script>
     SwaggerUIBundle({
       url: './openapi.yaml',
@@ -44,14 +44,24 @@ func HandleSwaggerUI(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(swaggerHTML))
 }
 
-// HandleOpenAPISpec serves the OpenAPI YAML spec file.
-func HandleOpenAPISpec(w http.ResponseWriter, r *http.Request) {
-	data, err := openAPISpec.ReadFile("swagger_res/openapi.yaml")
-	if err != nil {
-		http.Error(w, "spec not found", http.StatusInternalServerError)
-		return
+func serveEmbedded(name, contentType string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		data, err := swaggerRes.ReadFile("swagger_res/" + name)
+		if err != nil {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		w.Write(data)
 	}
-	w.Header().Set("Content-Type", "application/yaml")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Write(data)
 }
+
+// HandleOpenAPISpec serves the OpenAPI YAML spec.
+var HandleOpenAPISpec = serveEmbedded("openapi.yaml", "application/yaml")
+
+// HandleSwaggerJS serves the embedded swagger-ui-bundle JS.
+var HandleSwaggerJS = serveEmbedded("swagger-ui-bundle.min.js", "application/javascript")
+
+// HandleSwaggerCSS serves the embedded swagger-ui CSS.
+var HandleSwaggerCSS = serveEmbedded("swagger-ui.min.css", "text/css")
