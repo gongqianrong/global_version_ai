@@ -163,6 +163,37 @@ func (r *OrderRepo) ListByUser(ctx context.Context, userID int64, state, limit, 
 	return orders, total, rows.Err()
 }
 
+// GetDetailsByOrderIDs returns order details for multiple orders at once.
+func (r *OrderRepo) GetDetailsByOrderIDs(ctx context.Context, orderIDs []int64) (map[int64][]domain.OrderDetail, error) {
+	if len(orderIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := r.db.Pool.Query(ctx,
+		`SELECT id, order_id, goods_mid, goods_name, goods_num, goods_img, goods_url,
+		  goods_amount_jp, commission_fee_jp, shipping_fee_jp,
+		  seller_id, seller_name, platform, condition, state, created_at
+		 FROM order_details WHERE order_id = ANY($1) ORDER BY id`,
+		orderIDs,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("order_repo: get details by ids: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[int64][]domain.OrderDetail)
+	for rows.Next() {
+		var d domain.OrderDetail
+		if err := rows.Scan(&d.ID, &d.OrderID, &d.GoodsMid, &d.GoodsName, &d.GoodsNum,
+			&d.GoodsImg, &d.GoodsUrl, &d.GoodsAmountJp, &d.CommissionFeeJp,
+			&d.ShippingFeeJp, &d.SellerID, &d.SellerName, &d.Platform,
+			&d.Condition, &d.State, &d.CreatedAt); err != nil {
+			return nil, fmt.Errorf("order_repo: scan detail: %w", err)
+		}
+		result[d.OrderID] = append(result[d.OrderID], d)
+	}
+	return result, rows.Err()
+}
+
 // CancelExpired cancels all pending orders older than the given timeout.
 // Returns the number of cancelled orders.
 func (r *OrderRepo) CancelExpired(ctx context.Context, timeout time.Duration) (int64, error) {

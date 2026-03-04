@@ -97,6 +97,7 @@ type OrderRepository interface {
 	GetByOrderNumber(ctx context.Context, orderNumber string) (*domain.Order, []domain.OrderDetail, error)
 	UpdateState(ctx context.Context, orderNumber string, fromState, toState int) error
 	ListByUser(ctx context.Context, userID int64, state, limit, offset int) ([]domain.Order, int64, error)
+	GetDetailsByOrderIDs(ctx context.Context, orderIDs []int64) (map[int64][]domain.OrderDetail, error)
 }
 
 // OrderDetailResponse is a single order detail item in API responses.
@@ -360,8 +361,36 @@ func (s *OrderService) ListOrders(ctx context.Context, userID int64, state, page
 		return nil, 0, fmt.Errorf("order_service: list: %w", err)
 	}
 
+	// Batch fetch order details for all orders.
+	var orderIDs []int64
+	for _, o := range orders {
+		orderIDs = append(orderIDs, o.ID)
+	}
+	detailsMap, err := s.orders.GetDetailsByOrderIDs(ctx, orderIDs)
+	if err != nil {
+		return nil, 0, fmt.Errorf("order_service: list details: %w", err)
+	}
+
 	var list []OrderResponse
 	for _, o := range orders {
+		var detailList []OrderDetailResponse
+		for _, d := range detailsMap[o.ID] {
+			detailList = append(detailList, OrderDetailResponse{
+				GoodsMid:      d.GoodsMid,
+				GoodsName:     d.GoodsName,
+				GoodsNum:      d.GoodsNum,
+				GoodsImg:      d.GoodsImg,
+				GoodsUrl:      d.GoodsUrl,
+				GoodsAmountJp: d.GoodsAmountJp,
+				CommissionFee: d.CommissionFeeJp,
+				ShippingFee:   d.ShippingFeeJp,
+				SellerID:      d.SellerID,
+				SellerName:    d.SellerName,
+				Platform:      d.Platform,
+				Condition:     d.Condition,
+				State:         d.State,
+			})
+		}
 		list = append(list, OrderResponse{
 			OrderNumber:     o.OrderNumber,
 			OrderState:      o.OrderState,
@@ -371,6 +400,7 @@ func (s *OrderService) ListOrders(ctx context.Context, userID int64, state, page
 			OrderInpriceJp:  o.OrderInpriceJp,
 			OrderPaytype:    o.OrderPaytype,
 			OrderRemark:     o.OrderRemark,
+			OrderDetailList: detailList,
 			CreatedAt:       o.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
