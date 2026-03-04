@@ -1,0 +1,1793 @@
+openapi: "3.0.3"
+info:
+  title: Rakutao Collection Gateway API
+  description: |
+    乐淘集运网关 API，提供商品搜索、购物车、收藏、关注卖家、钱包、订单等功能。
+
+    ## 认证方式
+    受保护的接口需要在请求头中携带 JWT Token：
+    ```
+    Authorization: Bearer <token>
+    ```
+    Token 通过注册、登录或 OAuth 登录获取，有效期 72 小时。
+
+    ## 多语言
+    通过 `Accept-Language` 请求头指定语言（zh-TW / ja / en），默认 zh-TW。
+
+    ## 通用响应格式
+    ```json
+    {
+      "code": 0,
+      "data": { ... },
+      "message": "",
+      "request_id": "xxx"
+    }
+    ```
+    - `code=0` 表示成功，`data` 包含业务数据
+    - `code≠0` 表示错误，`message` 包含错误描述
+  version: "1.0.0"
+
+servers:
+  - url: https://api.rakutao.vip
+    description: Production
+  - url: http://52.195.4.10:8080
+    description: Dev
+
+tags:
+  - name: Public
+    description: 公开接口（健康检查、搜索、商品详情）
+  - name: Surugaya
+    description: 骏河屋扩展接口（评论、店铺、折扣、活动、分类）
+  - name: Auth
+    description: 注册 / 登录 / OAuth
+  - name: Cart
+    description: 购物车（需 JWT）
+  - name: Favorites
+    description: 收藏夹（需 JWT）
+  - name: Sellers
+    description: 关注卖家（需 JWT）
+  - name: Wallet
+    description: 钱包（需 JWT）
+  - name: Orders
+    description: 订单（需 JWT）
+  - name: Admin
+    description: 管理员接口（需 JWT + admin）
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 0
+        data:
+          type: object
+        message:
+          type: string
+        request_id:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user_id:
+          type: integer
+          format: int64
+        email:
+          type: string
+        nickname:
+          type: string
+
+    ProductSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        title_original:
+          type: string
+        description:
+          type: string
+        price_jpy:
+          type: integer
+          format: int64
+        platform:
+          type: string
+        status:
+          type: string
+        is_translated:
+          type: boolean
+        images:
+          type: array
+          items:
+            type: string
+
+    ProductDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        platform:
+          type: string
+        title:
+          type: string
+        title_original:
+          type: string
+        description:
+          type: string
+        description_original:
+          type: string
+        images:
+          type: array
+          items:
+            type: string
+        price_jpy:
+          type: integer
+          format: int64
+        service_fee_jpy:
+          type: integer
+          format: int64
+        original_price:
+          type: integer
+          format: int64
+        shipping_type:
+          type: string
+        shipping_fee_jpy:
+          type: integer
+          format: int64
+        brand:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+        categories:
+          type: array
+          items:
+            type: string
+        condition:
+          type: string
+        status:
+          type: string
+        quantity:
+          type: integer
+        seller:
+          type: object
+          properties:
+            seller_id:
+              type: string
+            seller_name:
+              type: string
+        variants:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              value:
+                type: string
+        content_rating:
+          type: string
+        listed_at:
+          type: string
+          format: date-time
+        is_translated:
+          type: boolean
+
+    CartGroup:
+      type: object
+      properties:
+        seller_id:
+          type: string
+        seller_name:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CartItem"
+
+    CartItem:
+      type: object
+      properties:
+        product_id:
+          type: string
+        quantity:
+          type: integer
+        price_at_add:
+          type: integer
+          format: int64
+        current_price:
+          type: integer
+          format: int64
+        price_changed:
+          type: boolean
+        title:
+          type: string
+        title_original:
+          type: string
+        image:
+          type: string
+        platform:
+          type: string
+        status:
+          type: string
+        seller_id:
+          type: string
+        seller_name:
+          type: string
+        is_translated:
+          type: boolean
+
+    FavoriteItem:
+      type: object
+      properties:
+        product_id:
+          type: string
+        title:
+          type: string
+        title_original:
+          type: string
+        image:
+          type: string
+        price_jpy:
+          type: integer
+          format: int64
+        platform:
+          type: string
+        status:
+          type: string
+        is_translated:
+          type: boolean
+        added_at:
+          type: string
+          format: date-time
+
+    FollowedSeller:
+      type: object
+      properties:
+        seller_id:
+          type: string
+        user_id:
+          type: integer
+          format: int64
+        seller_name:
+          type: string
+        followed_at:
+          type: string
+          format: date-time
+
+    WalletTransaction:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        user_id:
+          type: integer
+          format: int64
+        type:
+          type: string
+          enum: [recharge, purchase, refund, adjustment]
+        amount:
+          type: integer
+          format: int64
+        balance_after:
+          type: integer
+          format: int64
+        description:
+          type: string
+        related_order:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    SettlementDetail:
+      type: object
+      properties:
+        goodsMid:
+          type: string
+        goodsName:
+          type: string
+        goodsNum:
+          type: integer
+        goodsImg:
+          type: string
+        goodsUrl:
+          type: string
+        goodsSellerId:
+          type: string
+        goodsAmountJp:
+          type: integer
+          format: int64
+        commissionFeeJp:
+          type: integer
+          format: int64
+        shippingFee:
+          type: integer
+          format: int64
+        platform:
+          type: string
+        condition:
+          type: string
+        sellerId:
+          type: string
+        state:
+          type: integer
+        blockLevel:
+          type: integer
+
+    OrderDetail:
+      type: object
+      properties:
+        goodsMid:
+          type: string
+        goodsName:
+          type: string
+        goodsNum:
+          type: integer
+        goodsImg:
+          type: string
+        goodsUrl:
+          type: string
+        goodsAmountJp:
+          type: integer
+          format: int64
+        commissionFeeJp:
+          type: integer
+          format: int64
+        shippingFee:
+          type: integer
+          format: int64
+        sellerId:
+          type: string
+        sellerName:
+          type: string
+        platform:
+          type: string
+        condition:
+          type: string
+        state:
+          type: integer
+
+    OrderResponse:
+      type: object
+      properties:
+        orderNumber:
+          type: string
+        orderState:
+          type: integer
+          description: "0=待付款 1=已付款 2=采购中 3=已入库 4=打包中 5=已打包 6=已发货 7=已完成 8=已取消 9=已退款"
+        orderTotalJp:
+          type: integer
+          format: int64
+        commissionFeeJp:
+          type: integer
+          format: int64
+        shippingFeeJp:
+          type: integer
+          format: int64
+        orderInpriceJp:
+          type: integer
+          format: int64
+        orderPaytype:
+          type: integer
+        orderRemark:
+          type: string
+        orderDetailList:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderDetail"
+        createdAt:
+          type: string
+          example: "2026-03-04 12:00:00"
+
+    OrderItem:
+      type: object
+      required: [product_id, quantity]
+      properties:
+        product_id:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+
+paths:
+  # ────────── Public ──────────
+  /health:
+    get:
+      tags: [Public]
+      summary: 健康检查
+      operationId: healthCheck
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok, degraded]
+                  platforms:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        status:
+                          type: string
+                        message:
+                          type: string
+
+  /api/v1/search:
+    get:
+      tags: [Public]
+      summary: 跨平台商品搜索
+      operationId: search
+      parameters:
+        - name: keyword
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: price_min
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: price_max
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: platforms
+          in: query
+          description: 逗号分隔的平台列表
+          schema:
+            type: string
+        - name: brand_id
+          in: query
+          schema:
+            type: string
+        - name: categories
+          in: query
+          description: 逗号分隔的分类列表
+          schema:
+            type: string
+        - name: condition
+          in: query
+          description: 逗号分隔的成色条件
+          schema:
+            type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+        - name: content_rating
+          in: query
+          schema:
+            type: string
+            default: general
+      responses:
+        "200":
+          description: 搜索结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          hits:
+                            type: object
+                            properties:
+                              total:
+                                type: object
+                                properties:
+                                  value:
+                                    type: integer
+                                    format: int64
+                              hits:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    _id:
+                                      type: string
+                                    _source:
+                                      $ref: "#/components/schemas/ProductSummary"
+                          realtime_stream_id:
+                            type: string
+
+  /api/v1/search/stream/{streamID}:
+    get:
+      tags: [Public]
+      summary: 实时搜索结果（WebSocket）
+      operationId: searchStream
+      description: |
+        WebSocket 连接，实时推送各平台搜索结果。
+
+        消息类型：
+        - `results`: 搜索结果
+        - `error`: 错误
+        - `done`: 搜索完成
+      parameters:
+        - name: streamID
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "101":
+          description: WebSocket 升级成功
+
+  /api/v1/products/{id}:
+    get:
+      tags: [Public]
+      summary: 商品详情
+      operationId: getProduct
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 商品详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ProductDetail"
+
+  /api/v1/platform/search:
+    get:
+      tags: [Public]
+      summary: 单平台搜索
+      operationId: platformSearch
+      parameters:
+        - name: keyword
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: platform
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: price_min
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: price_max
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: brand_id
+          in: query
+          schema:
+            type: string
+        - name: categories
+          in: query
+          schema:
+            type: string
+        - name: condition
+          in: query
+          schema:
+            type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+        - name: content_rating
+          in: query
+          schema:
+            type: string
+            default: general
+      responses:
+        "200":
+          description: 搜索结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          products:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/ProductSummary"
+                          total:
+                            type: integer
+                            format: int64
+                          platform:
+                            type: string
+
+  # ────────── Surugaya ──────────
+  /api/v1/surugaya/products/{id}/reviews:
+    get:
+      tags: [Surugaya]
+      summary: 商品评论
+      operationId: surugayaProductReviews
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 评论数据
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  /api/v1/surugaya/products/{id}/stores:
+    get:
+      tags: [Surugaya]
+      summary: 商品店铺信息
+      operationId: surugayaProductStores
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 店铺数据
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  /api/v1/surugaya/discounts:
+    get:
+      tags: [Surugaya]
+      summary: 折扣信息
+      operationId: surugayaDiscounts
+      responses:
+        "200":
+          description: 折扣数据
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  /api/v1/surugaya/comments:
+    get:
+      tags: [Surugaya]
+      summary: 用户评论
+      operationId: surugayaComments
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: sort
+          in: query
+          schema:
+            type: string
+            default: "-created_at"
+      responses:
+        "200":
+          description: 评论列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  /api/v1/surugaya/campaigns:
+    get:
+      tags: [Surugaya]
+      summary: 活动列表
+      operationId: surugayaCampaigns
+      responses:
+        "200":
+          description: 活动数据
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  /api/v1/surugaya/campaigns/detail:
+    get:
+      tags: [Surugaya]
+      summary: 活动详情
+      operationId: surugayaCampaignDetail
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 活动详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  /api/v1/surugaya/categories:
+    get:
+      tags: [Surugaya]
+      summary: 分类列表
+      operationId: surugayaCategories
+      responses:
+        "200":
+          description: 分类数据
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  /api/v1/surugaya/categories/{id}:
+    get:
+      tags: [Surugaya]
+      summary: 子分类
+      operationId: surugayaSubCategories
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 子分类数据
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  # ────────── Auth ──────────
+  /api/v1/auth/send-code:
+    post:
+      tags: [Auth]
+      summary: 发送邮箱验证码
+      operationId: sendCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "200":
+          description: 验证码已发送
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: verification code sent
+
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      summary: 邮箱注册
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, nickname, code]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 6
+                nickname:
+                  type: string
+                code:
+                  type: string
+                  description: 6位邮箱验证码
+      responses:
+        "200":
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AuthResponse"
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: 邮箱登录
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        "200":
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AuthResponse"
+
+  /api/v1/auth/google:
+    post:
+      tags: [Auth]
+      summary: Google OAuth 登录
+      operationId: googleLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_token]
+              properties:
+                id_token:
+                  type: string
+                  description: Google ID Token (JWT)
+      responses:
+        "200":
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AuthResponse"
+
+  /api/v1/auth/apple:
+    post:
+      tags: [Auth]
+      summary: Apple OAuth 登录
+      operationId: appleLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_token]
+              properties:
+                id_token:
+                  type: string
+                  description: Apple ID Token (JWT)
+      responses:
+        "200":
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AuthResponse"
+
+  # ────────── Cart ──────────
+  /api/v1/cart:
+    get:
+      tags: [Cart]
+      summary: 查看购物车
+      operationId: listCart
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: 购物车列表（按卖家分组）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          groups:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/CartGroup"
+                          total_items:
+                            type: integer
+    post:
+      tags: [Cart]
+      summary: 添加商品到购物车
+      operationId: addToCart
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id]
+              properties:
+                product_id:
+                  type: string
+                quantity:
+                  type: integer
+                  default: 1
+                  minimum: 1
+      responses:
+        "200":
+          description: 添加成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          product_id:
+                            type: string
+                          user_id:
+                            type: integer
+                            format: int64
+                          quantity:
+                            type: integer
+                          price_at_add:
+                            type: integer
+                            format: int64
+                          added_at:
+                            type: string
+                            format: date-time
+
+  /api/v1/cart/{productID}:
+    put:
+      tags: [Cart]
+      summary: 修改购物车商品数量
+      operationId: updateCartQuantity
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: productID
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties:
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          product_id:
+                            type: string
+                          quantity:
+                            type: integer
+    delete:
+      tags: [Cart]
+      summary: 从购物车移除商品
+      operationId: removeFromCart
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: productID
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 移除成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          product_id:
+                            type: string
+                          status:
+                            type: string
+                            example: removed
+
+  # ────────── Favorites ──────────
+  /api/v1/favorites:
+    get:
+      tags: [Favorites]
+      summary: 收藏列表
+      operationId: listFavorites
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        "200":
+          description: 收藏列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/FavoriteItem"
+                          total:
+                            type: integer
+                            format: int64
+                          page:
+                            type: integer
+
+  /api/v1/favorites/{productID}:
+    post:
+      tags: [Favorites]
+      summary: 收藏商品
+      operationId: addFavorite
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: productID
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 收藏成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          product_id:
+                            type: string
+                          user_id:
+                            type: integer
+                            format: int64
+                          added_at:
+                            type: string
+                            format: date-time
+    delete:
+      tags: [Favorites]
+      summary: 取消收藏
+      operationId: removeFavorite
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: productID
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 取消成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          product_id:
+                            type: string
+                          status:
+                            type: string
+                            example: removed
+
+  /api/v1/favorites/check:
+    get:
+      tags: [Favorites]
+      summary: 批量检查是否已收藏
+      operationId: checkFavorites
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: product_ids
+          in: query
+          required: true
+          description: 逗号分隔的商品 ID
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 收藏状态
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        additionalProperties:
+                          type: boolean
+                        example:
+                          "prod_001": true
+                          "prod_002": false
+
+  # ────────── Sellers ──────────
+  /api/v1/sellers/{sellerID}/follow:
+    post:
+      tags: [Sellers]
+      summary: 关注卖家
+      operationId: followSeller
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: sellerID
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                seller_name:
+                  type: string
+      responses:
+        "200":
+          description: 关注成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/FollowedSeller"
+    delete:
+      tags: [Sellers]
+      summary: 取消关注卖家
+      operationId: unfollowSeller
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: sellerID
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 取消关注成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          seller_id:
+                            type: string
+                          status:
+                            type: string
+                            example: unfollowed
+
+  /api/v1/sellers/followed:
+    get:
+      tags: [Sellers]
+      summary: 已关注卖家列表
+      operationId: listFollowedSellers
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        "200":
+          description: 关注列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/FollowedSeller"
+                          total:
+                            type: integer
+                            format: int64
+                          page:
+                            type: integer
+
+  /api/v1/sellers/check:
+    get:
+      tags: [Sellers]
+      summary: 批量检查是否已关注
+      operationId: checkFollowedSellers
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          description: 逗号分隔的卖家 ID
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 关注状态
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        additionalProperties:
+                          type: boolean
+                        example:
+                          "seller_001": true
+                          "seller_002": false
+
+  # ────────── Wallet ──────────
+  /api/v1/wallet/balance:
+    get:
+      tags: [Wallet]
+      summary: 查询钱包余额
+      operationId: getWalletBalance
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: 余额信息
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          balance:
+                            type: integer
+                            format: int64
+                            description: 余额（日元）
+                          currency:
+                            type: string
+                            example: JPY
+
+  /api/v1/wallet/transactions:
+    get:
+      tags: [Wallet]
+      summary: 钱包交易记录
+      operationId: listWalletTransactions
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        "200":
+          description: 交易记录列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/WalletTransaction"
+                          total:
+                            type: integer
+                            format: int64
+                          page:
+                            type: integer
+
+  # ────────── Orders ──────────
+  /api/v1/order/settlement:
+    post:
+      tags: [Orders]
+      summary: 订单结算预览
+      operationId: orderSettlement
+      security:
+        - BearerAuth: []
+      description: 预览订单价格，不写入数据库
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/OrderItem"
+      responses:
+        "200":
+          description: 结算预览
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          orderTotalJp:
+                            type: integer
+                            format: int64
+                          commissionFeeJp:
+                            type: integer
+                            format: int64
+                          orderInpriceJp:
+                            type: integer
+                            format: int64
+                          orderRate:
+                            type: integer
+                          orderPaytype:
+                            type: integer
+                          orderType:
+                            type: integer
+                          isChange:
+                            type: integer
+                          orderDetailList:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/SettlementDetail"
+                          walletBalance:
+                            type: integer
+                            format: int64
+                          totalShippingFee:
+                            type: integer
+                            format: int64
+
+  /api/v1/order/confirm:
+    post:
+      tags: [Orders]
+      summary: 确认下单
+      operationId: orderConfirm
+      security:
+        - BearerAuth: []
+      description: 创建待付款订单，从购物车移除对应商品
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/OrderItem"
+                order_paytype:
+                  type: integer
+                order_remark:
+                  type: string
+                order_purchase_type:
+                  type: integer
+                  default: 1
+      responses:
+        "200":
+          description: 订单已创建
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          orderNumber:
+                            type: string
+                            example: RO20260304120000a1b2
+                          orderState:
+                            type: integer
+                            example: 0
+                          orderTotalJp:
+                            type: integer
+                            format: int64
+                          commissionFeeJp:
+                            type: integer
+                            format: int64
+                          orderInpriceJp:
+                            type: integer
+                            format: int64
+                          orderPaytype:
+                            type: integer
+                          orderDetailList:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/SettlementDetail"
+                          totalShippingFee:
+                            type: integer
+                            format: int64
+
+  /api/v1/order/pay:
+    post:
+      tags: [Orders]
+      summary: 支付订单
+      operationId: orderPay
+      security:
+        - BearerAuth: []
+      description: 使用钱包余额支付待付款订单
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order_number]
+              properties:
+                order_number:
+                  type: string
+      responses:
+        "200":
+          description: 支付成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          orderNumber:
+                            type: string
+                          orderState:
+                            type: integer
+                            example: 1
+                          paidAmount:
+                            type: integer
+                            format: int64
+                          balanceAfter:
+                            type: integer
+                            format: int64
+
+  /api/v1/order/cancel:
+    post:
+      tags: [Orders]
+      summary: 取消订单
+      operationId: orderCancel
+      security:
+        - BearerAuth: []
+      description: 仅可取消待付款状态的订单
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order_number]
+              properties:
+                order_number:
+                  type: string
+      responses:
+        "200":
+          description: 取消成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          orderNumber:
+                            type: string
+                          orderState:
+                            type: integer
+                            example: 8
+
+  /api/v1/order/{orderNumber}:
+    get:
+      tags: [Orders]
+      summary: 订单详情
+      operationId: getOrder
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderNumber
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 订单详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/OrderResponse"
+
+  /api/v1/orders:
+    get:
+      tags: [Orders]
+      summary: 订单列表
+      operationId: listOrders
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: state
+          in: query
+          description: "订单状态过滤，-1=全部"
+          schema:
+            type: integer
+            default: -1
+      responses:
+        "200":
+          description: 订单列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/OrderResponse"
+                          total:
+                            type: integer
+                            format: int64
+                          page:
+                            type: integer
+
+  # ────────── Admin ──────────
+  /api/v1/admin/wallet/adjust:
+    post:
+      tags: [Admin]
+      summary: 管理员调整用户钱包
+      operationId: adminWalletAdjust
+      security:
+        - BearerAuth: []
+      description: 需要管理员权限（is_admin=true）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, amount, type, description]
+              properties:
+                user_id:
+                  type: integer
+                  format: int64
+                amount:
+                  type: integer
+                  format: int64
+                  description: 非零金额（正=充值，负=扣减）
+                type:
+                  type: string
+                  enum: [recharge, adjustment, refund]
+                description:
+                  type: string
+                related_order:
+                  type: string
+      responses:
+        "200":
+          description: 调整成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          balance:
+                            type: integer
+                            format: int64
+                          transaction_id:
+                            type: integer
+                            format: int64
