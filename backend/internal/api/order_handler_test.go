@@ -72,6 +72,10 @@ func (m *mockOrderRepo) ListByUser(_ context.Context, _ int64, _, _, _ int) ([]d
 	return m.orders, m.total, nil
 }
 
+func (m *mockOrderRepo) GetDetailsByOrderIDs(_ context.Context, _ []int64) (map[int64][]domain.OrderDetail, error) {
+	return nil, nil
+}
+
 type mockCartRemover struct {
 	removed []string
 }

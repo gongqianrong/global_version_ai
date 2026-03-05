@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/rakutao/collection-gateway/internal/domain"
 	"github.com/rakutao/collection-gateway/internal/i18n"
+	"github.com/rakutao/collection-gateway/internal/repo"
 	"github.com/rakutao/collection-gateway/internal/translate"
 )
 
@@ -27,11 +28,17 @@ type ProductHandler struct {
 	fallback      ProductFetcher
 	translator    translate.Translator
 	productWriter ProductWriter
+	browseRepo    *repo.BrowsingRepo
 }
 
 // NewProductHandler creates a ProductHandler with an optional fallback fetcher.
 func NewProductHandler(fetcher ProductFetcher, fallback ProductFetcher, tr translate.Translator, pw ProductWriter) *ProductHandler {
 	return &ProductHandler{fetcher: fetcher, fallback: fallback, translator: tr, productWriter: pw}
+}
+
+// SetBrowseTracker sets the browsing repo for async browse tracking.
+func (h *ProductHandler) SetBrowseTracker(br *repo.BrowsingRepo) {
+	h.browseRepo = br
 }
 
 // HandleGetProduct handles GET /api/v1/products/{id}.
@@ -59,6 +66,11 @@ func (h *ProductHandler) HandleGetProduct(w http.ResponseWriter, r *http.Request
 		if changed && h.productWriter != nil {
 			go h.productWriter.Dispatch(context.Background(), []domain.UnifiedProduct{*product})
 		}
+	}
+
+	// Async browse tracking for authenticated users
+	if userID := UserIDFromContext(r.Context()); userID != 0 {
+		RecordBrowseAsync(h.browseRepo, userID, product)
 	}
 
 	resp := buildProductResponse(product, lang)

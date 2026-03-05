@@ -109,3 +109,47 @@ CREATE TABLE IF NOT EXISTS order_details (
     created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_order_details_order ON order_details(order_id);
+
+-- Recommendation system
+CREATE TABLE IF NOT EXISTS user_preferences (
+    id         BIGSERIAL    PRIMARY KEY,
+    user_id    BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    category   VARCHAR(100) NOT NULL,
+    weight     REAL         NOT NULL DEFAULT 1.0,
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id, category)
+);
+
+CREATE TABLE IF NOT EXISTS search_history (
+    id         BIGSERIAL    PRIMARY KEY,
+    user_id    BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    keyword    VARCHAR(500) NOT NULL,
+    keyword_ja VARCHAR(500) NOT NULL DEFAULT '',
+    platform   VARCHAR(50)  NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_search_history_user ON search_history(user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS browsing_history (
+    id         BIGSERIAL    PRIMARY KEY,
+    user_id    BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    product_id VARCHAR(255) NOT NULL,
+    category   VARCHAR(100) NOT NULL DEFAULT '',
+    brand      VARCHAR(100) NOT NULL DEFAULT '',
+    seller_id  VARCHAR(255) NOT NULL DEFAULT '',
+    platform   VARCHAR(50)  NOT NULL DEFAULT '',
+    viewed_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_browsing_history_user ON browsing_history(user_id, viewed_at DESC);
+
+CREATE TABLE IF NOT EXISTS user_rec_weights (
+    id          BIGSERIAL    PRIMARY KEY,
+    user_id     BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    signal_type VARCHAR(20)  NOT NULL,
+    dimension   VARCHAR(20)  NOT NULL,
+    value       VARCHAR(255) NOT NULL,
+    weight      REAL         NOT NULL DEFAULT 0.0,
+    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id, signal_type, dimension, value)
+);
+CREATE INDEX IF NOT EXISTS idx_rec_weights_user ON user_rec_weights(user_id);

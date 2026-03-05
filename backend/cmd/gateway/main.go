@@ -189,15 +189,16 @@ func main() {
 
 	// --- PostgreSQL + JWT + Auth/Cart/Favorite/OAuth handlers ---
 	var (
-		jwtManager      *auth.JWTManager
-		authHandler     *api.AuthHandler
-		oauthHandler    *api.OAuthHandler
-		cartHandler     *api.CartHandler
-		favoriteHandler *api.FavoriteHandler
-		sellerHandler   *api.SellerHandler
-		walletHandler   *api.WalletHandler
-		orderHandler    *api.OrderHandler
-		adminChecker    api.UserAdminChecker
+		jwtManager            *auth.JWTManager
+		authHandler           *api.AuthHandler
+		oauthHandler          *api.OAuthHandler
+		cartHandler           *api.CartHandler
+		favoriteHandler       *api.FavoriteHandler
+		sellerHandler         *api.SellerHandler
+		walletHandler         *api.WalletHandler
+		orderHandler          *api.OrderHandler
+		recommendationHandler *api.RecommendationHandler
+		adminChecker          api.UserAdminChecker
 	)
 
 	databaseURL := os.Getenv("DATABASE_URL")
@@ -263,6 +264,33 @@ func main() {
 			oauthHandler = api.NewOAuthHandler(userRepo, oauthRepo, jwtManager, googleClientID, appleBundleID)
 			log.Printf("  OAuth:             enabled (google=%v, apple=%v)", googleClientID != "", appleBundleID != "")
 		}
+
+		// Recommendation system
+		prefRepo := repo.NewPreferenceRepo(pgDB)
+		browseRepo := repo.NewBrowsingRepo(pgDB)
+		searchHistRepo := repo.NewSearchHistoryRepo(pgDB)
+		recWeightRepo := repo.NewRecWeightRepo(pgDB)
+
+		recSvc := service.NewRecommendationService(
+			prefRepo, browseRepo, searchHistRepo, recWeightRepo,
+			favRepo, cartRepo, orderRepo, sellerFollowRepo,
+			esClient, esIndexName, cacheClient,
+		)
+		recommendationHandler = api.NewRecommendationHandler(prefRepo, browseRepo, searchHistRepo, recSvc)
+		// Inject browseRepo into productHandler for async browse tracking
+		productHandler.SetBrowseTracker(browseRepo)
+		log.Printf("  Recommendations:   enabled")
+
+		// Background: recompute recommendation weights every 30 minutes.
+		go func() {
+			ticker := time.NewTicker(30 * time.Minute)
+			defer ticker.Stop()
+			for range ticker.C {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+				recSvc.RecomputeActiveUsers(ctx)
+				cancel()
+			}
+		}()
 	} else {
 		log.Printf("  PostgreSQL:        disabled (DATABASE_URL or JWT_SECRET not set)")
 	}
@@ -282,6 +310,7 @@ func main() {
 		SellerHandler:         sellerHandler,
 		WalletHandler:         walletHandler,
 		OrderHandler:          orderHandler,
+		RecommendationHandler: recommendationHandler,
 		AdminChecker:          adminChecker,
 		JWTManager:            jwtManager,
 		CacheMiddleware:       cacheMiddleware,

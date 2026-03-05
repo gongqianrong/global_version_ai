@@ -23,6 +23,7 @@ type RouterConfig struct {
 	SellerHandler         *SellerHandler
 	WalletHandler         *WalletHandler
 	OrderHandler          *OrderHandler
+	RecommendationHandler *RecommendationHandler
 	AdminChecker          UserAdminChecker
 	JWTManager            *auth.JWTManager
 	CacheMiddleware       func(http.Handler) http.Handler
@@ -130,6 +131,15 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 					r.Post("/order/cancel", cfg.OrderHandler.HandleCancelOrder)
 					r.Get("/order/{orderNumber}", cfg.OrderHandler.HandleGetOrder)
 					r.Get("/orders", cfg.OrderHandler.HandleListOrders)
+				}
+
+				if cfg.RecommendationHandler != nil {
+					r.Post("/preferences", cfg.RecommendationHandler.HandleSetPreferences)
+					r.Get("/preferences", cfg.RecommendationHandler.HandleGetPreferences)
+					r.Post("/track/view", cfg.RecommendationHandler.HandleTrackView)
+					r.Post("/track/search", cfg.RecommendationHandler.HandleTrackSearch)
+					r.Get("/recommendations", cfg.RecommendationHandler.HandleGetRecommendations)
+					r.Get("/recommendations/{listType}", cfg.RecommendationHandler.HandleGetRecommendationList)
 				}
 			})
 		}
