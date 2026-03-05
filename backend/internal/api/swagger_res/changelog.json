@@ -1,6 +1,33 @@
 {
   "versions": [
     {
+      "version": "1.2.0",
+      "date": "2026-03-05",
+      "summary": "User behavior analysis and personalized recommendation system",
+      "changes": [
+        {
+          "type": "added",
+          "endpoints": ["POST /api/v1/preferences", "GET /api/v1/preferences"],
+          "description": "User preference categories: set and retrieve preferred product categories"
+        },
+        {
+          "type": "added",
+          "endpoints": ["POST /api/v1/track/view", "POST /api/v1/track/search"],
+          "description": "Behavior tracking: async recording of product views (5-min dedup) and search keywords"
+        },
+        {
+          "type": "added",
+          "endpoints": ["GET /api/v1/recommendations", "GET /api/v1/recommendations/{listType}"],
+          "description": "Personalized recommendations: 4 list types (for_you/browsing/sellers/new_arrivals), 6 items per list, first item highlighted, Redis-cached 30min"
+        },
+        {
+          "type": "modified",
+          "endpoints": ["GET /api/v1/products/{id}"],
+          "description": "Auto-records browsing history for authenticated users (fire-and-forget)"
+        }
+      ]
+    },
+    {
       "version": "1.1.0",
       "date": "2026-03-04",
       "summary": "Order system, wallet system, and seller follow features",
