@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -12,22 +13,39 @@ import (
 	"time"
 
 	"github.com/rakutao/collection-gateway/internal/auth"
-	"github.com/rakutao/collection-gateway/internal/cache"
-	"github.com/rakutao/collection-gateway/internal/email"
+	"github.com/rakutao/collection-gateway/internal/domain"
 	"github.com/rakutao/collection-gateway/internal/repo"
 	"golang.org/x/crypto/bcrypt"
 )
 
+// UserStore abstracts user persistence for testing.
+type UserStore interface {
+	Create(ctx context.Context, email, nickname, passwordHash string) (*domain.User, error)
+	GetByEmail(ctx context.Context, email string) (*domain.User, error)
+}
+
+// CacheStore abstracts cache operations for testing.
+type CacheStore interface {
+	Get(ctx context.Context, key string) ([]byte, error)
+	Set(ctx context.Context, key string, data []byte, ttl time.Duration) error
+	Del(ctx context.Context, key string) error
+}
+
+// EmailSender abstracts email sending for testing.
+type EmailSender interface {
+	SendVerifyCode(to, code string) error
+}
+
 // AuthHandler handles user registration and login.
 type AuthHandler struct {
-	users       *repo.UserRepo
+	users       UserStore
 	jwt         *auth.JWTManager
-	redis       *cache.Client
-	emailSender *email.Sender
+	redis       CacheStore
+	emailSender EmailSender
 }
 
 // NewAuthHandler creates an AuthHandler.
-func NewAuthHandler(users *repo.UserRepo, jwt *auth.JWTManager, redis *cache.Client, emailSender *email.Sender) *AuthHandler {
+func NewAuthHandler(users UserStore, jwt *auth.JWTManager, redis CacheStore, emailSender EmailSender) *AuthHandler {
 	return &AuthHandler{users: users, jwt: jwt, redis: redis, emailSender: emailSender}
 }
 

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -12,15 +13,23 @@ import (
 	"github.com/rakutao/collection-gateway/internal/translate"
 )
 
+// CartStore abstracts cart persistence for testing.
+type CartStore interface {
+	Add(ctx context.Context, userID int64, productID string, quantity int, priceAtAdd int64) (*repo.CartItem, error)
+	UpdateQuantity(ctx context.Context, userID int64, productID string, quantity int) error
+	Remove(ctx context.Context, userID int64, productID string) error
+	ListByUser(ctx context.Context, userID int64) ([]repo.CartItem, error)
+}
+
 // CartHandler handles shopping cart endpoints.
 type CartHandler struct {
-	carts      *repo.CartRepo
+	carts      CartStore
 	esFetcher  ProductFetcher
 	translator translate.Translator
 }
 
 // NewCartHandler creates a CartHandler.
-func NewCartHandler(carts *repo.CartRepo, esFetcher ProductFetcher, tr translate.Translator) *CartHandler {
+func NewCartHandler(carts CartStore, esFetcher ProductFetcher, tr translate.Translator) *CartHandler {
 	return &CartHandler{carts: carts, esFetcher: esFetcher, translator: tr}
 }
 

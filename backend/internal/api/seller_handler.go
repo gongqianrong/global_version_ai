@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -11,13 +12,21 @@ import (
 	"github.com/rakutao/collection-gateway/internal/repo"
 )
 
+// SellerFollowStore abstracts seller-follow persistence for testing.
+type SellerFollowStore interface {
+	Follow(ctx context.Context, userID int64, sellerID, sellerName string) (*repo.FollowedSeller, error)
+	Unfollow(ctx context.Context, userID int64, sellerID string) error
+	ListByUser(ctx context.Context, userID int64, limit, offset int) ([]repo.FollowedSeller, int64, error)
+	BatchIsFollowing(ctx context.Context, userID int64, sellerIDs []string) (map[string]bool, error)
+}
+
 // SellerHandler handles seller follow/unfollow endpoints.
 type SellerHandler struct {
-	repo *repo.SellerFollowRepo
+	repo SellerFollowStore
 }
 
 // NewSellerHandler creates a SellerHandler.
-func NewSellerHandler(r *repo.SellerFollowRepo) *SellerHandler {
+func NewSellerHandler(r SellerFollowStore) *SellerHandler {
 	return &SellerHandler{repo: r}
 }
 

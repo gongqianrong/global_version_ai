@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"strconv"
@@ -13,15 +14,23 @@ import (
 	"github.com/rakutao/collection-gateway/internal/translate"
 )
 
+// FavoriteStore abstracts favorite persistence for testing.
+type FavoriteStore interface {
+	Add(ctx context.Context, userID int64, productID string) (*repo.FavoriteItem, error)
+	Remove(ctx context.Context, userID int64, productID string) error
+	ListByUser(ctx context.Context, userID int64, limit, offset int) ([]repo.FavoriteItem, int64, error)
+	BatchIsFavorited(ctx context.Context, userID int64, productIDs []string) (map[string]bool, error)
+}
+
 // FavoriteHandler handles favorites endpoints.
 type FavoriteHandler struct {
-	favorites  *repo.FavoriteRepo
+	favorites  FavoriteStore
 	esFetcher  ProductFetcher
 	translator translate.Translator
 }
 
 // NewFavoriteHandler creates a FavoriteHandler.
-func NewFavoriteHandler(favorites *repo.FavoriteRepo, esFetcher ProductFetcher, tr translate.Translator) *FavoriteHandler {
+func NewFavoriteHandler(favorites FavoriteStore, esFetcher ProductFetcher, tr translate.Translator) *FavoriteHandler {
 	return &FavoriteHandler{favorites: favorites, esFetcher: esFetcher, translator: tr}
 }
 
