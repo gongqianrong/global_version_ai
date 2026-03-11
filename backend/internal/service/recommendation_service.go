@@ -269,6 +269,11 @@ func (s *RecommendationService) GetRecommendations(ctx context.Context, userID i
 		return nil, fmt.Errorf("get weights: %w", err)
 	}
 
+	// New user with no weights — skip ES query
+	if len(weights) == 0 {
+		return []domain.RecommendationList{}, nil
+	}
+
 	types := []string{"for_you", "browsing", "sellers", "new_arrivals"}
 	if listType != "" {
 		types = []string{listType}

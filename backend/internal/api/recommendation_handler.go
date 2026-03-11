@@ -3,12 +3,12 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rakutao/collection-gateway/internal/domain"
 	"github.com/rakutao/collection-gateway/internal/repo"
-	"github.com/rakutao/collection-gateway/internal/service"
 )
 
 // PreferenceStore abstracts preference repository for testability.
@@ -27,12 +27,18 @@ type SearchHistoryStore interface {
 	Record(ctx context.Context, rec *domain.SearchRecord) error
 }
 
+// RecService abstracts recommendation service for testability.
+type RecService interface {
+	GetRecommendations(ctx context.Context, userID int64, listType string, refresh bool) ([]domain.RecommendationList, error)
+	InvalidateCache(ctx context.Context, userID int64)
+}
+
 // RecommendationHandler handles recommendation-related HTTP endpoints.
 type RecommendationHandler struct {
-	preferences  PreferenceStore
-	browsing     BrowsingStore
-	searchHist   SearchHistoryStore
-	recService   *service.RecommendationService
+	preferences PreferenceStore
+	browsing    BrowsingStore
+	searchHist  SearchHistoryStore
+	recService  RecService
 }
 
 // NewRecommendationHandler creates a new RecommendationHandler.
@@ -40,7 +46,7 @@ func NewRecommendationHandler(
 	prefs PreferenceStore,
 	browsing BrowsingStore,
 	searchHist SearchHistoryStore,
-	recSvc *service.RecommendationService,
+	recSvc RecService,
 ) *RecommendationHandler {
 	return &RecommendationHandler{
 		preferences: prefs,
@@ -131,7 +137,9 @@ func (h *RecommendationHandler) HandleTrackView(w http.ResponseWriter, r *http.R
 	}
 	go func() {
 		ctx := context.Background()
-		_ = h.browsing.Record(ctx, rec)
+		if err := h.browsing.Record(ctx, rec); err != nil {
+			log.Printf("[track] record view for user %d product %s: %v", userID, req.ProductID, err)
+		}
 	}()
 
 	Success(w, r, nil)
@@ -163,7 +171,9 @@ func (h *RecommendationHandler) HandleTrackSearch(w http.ResponseWriter, r *http
 	}
 	go func() {
 		ctx := context.Background()
-		_ = h.searchHist.Record(ctx, rec)
+		if err := h.searchHist.Record(ctx, rec); err != nil {
+			log.Printf("[track] record search for user %d keyword %s: %v", userID, req.Keyword, err)
+		}
 	}()
 
 	Success(w, r, nil)
