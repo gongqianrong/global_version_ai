@@ -1,23 +1,33 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/rakutao/collection-gateway/internal/domain"
 	"github.com/rakutao/collection-gateway/internal/service"
 )
 
+// OrderStateUpdater abstracts order state update for admin use.
+type OrderStateUpdater interface {
+	GetByOrderNumber(ctx context.Context, orderNumber string) (*domain.Order, []domain.OrderDetail, error)
+	UpdateState(ctx context.Context, orderNumber string, fromState, toState int) error
+}
+
 // OrderHandler handles order endpoints.
 type OrderHandler struct {
-	svc *service.OrderService
+	svc          *service.OrderService
+	orderUpdater OrderStateUpdater // for admin state transitions
 }
 
 // NewOrderHandler creates an OrderHandler.
-func NewOrderHandler(svc *service.OrderService) *OrderHandler {
-	return &OrderHandler{svc: svc}
+func NewOrderHandler(svc *service.OrderService, updater OrderStateUpdater) *OrderHandler {
+	return &OrderHandler{svc: svc, orderUpdater: updater}
 }
 
 type settlementRequest struct {
@@ -217,5 +227,44 @@ func (h *OrderHandler) HandleCancelOrder(w http.ResponseWriter, r *http.Request)
 	Success(w, r, map[string]interface{}{
 		"orderNumber": req.OrderNumber,
 		"orderState":  8, // Cancelled
+	})
+}
+
+// HandleAdminUpdateOrderState handles POST /api/v1/admin/orders/{orderNumber}/state.
+// Used by automation scripts to drive the order lifecycle:
+//
+//	Paid(1) → Purchasing(2)  : automation script successfully places order on source platform
+//	Purchasing(2) → Warehoused(3) : WMS scans item into JP warehouse
+func (h *OrderHandler) HandleAdminUpdateOrderState(w http.ResponseWriter, r *http.Request) {
+	orderNumber := chi.URLParam(r, "orderNumber")
+
+	var req struct {
+		State int `json:"state"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		ErrorWithCode(w, r, http.StatusBadRequest, 40002, "invalid request body")
+		return
+	}
+
+	order, _, err := h.orderUpdater.GetByOrderNumber(r.Context(), orderNumber)
+	if err != nil {
+		ErrorWithCode(w, r, http.StatusNotFound, 40401, "order not found")
+		return
+	}
+
+	if !domain.IsValidOrderTransition(order.OrderState, req.State) {
+		ErrorWithCode(w, r, http.StatusBadRequest, 40017,
+			fmt.Sprintf("invalid state transition: %d → %d", order.OrderState, req.State))
+		return
+	}
+
+	if err := h.orderUpdater.UpdateState(r.Context(), orderNumber, order.OrderState, req.State); err != nil {
+		ErrorWithCode(w, r, http.StatusInternalServerError, 50001, "failed to update order state")
+		return
+	}
+
+	Success(w, r, map[string]interface{}{
+		"order_number": orderNumber,
+		"state":        req.State,
 	})
 }

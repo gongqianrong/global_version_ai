@@ -23,6 +23,7 @@ type RouterConfig struct {
 	SellerHandler         *SellerHandler
 	WalletHandler         *WalletHandler
 	RechargeHandler       *RechargeHandler
+	WaybillHandler        *WaybillHandler
 	OrderHandler          *OrderHandler
 	RecommendationHandler *RecommendationHandler
 	AdminChecker          UserAdminChecker
@@ -145,6 +146,14 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 					r.Get("/orders", cfg.OrderHandler.HandleListOrders)
 				}
 
+				if cfg.WaybillHandler != nil {
+					r.Post("/waybill/apply", cfg.WaybillHandler.HandleApplyShipment)
+					r.Get("/waybills", cfg.WaybillHandler.HandleListWaybills)
+					r.Get("/waybill/{waybillNo}", cfg.WaybillHandler.HandleGetWaybill)
+					r.Post("/waybill/{waybillNo}/pay-shipping", cfg.WaybillHandler.HandlePayShippingFee)
+					r.Post("/waybill/{waybillNo}/confirm-receipt", cfg.WaybillHandler.HandleConfirmReceipt)
+				}
+
 				if cfg.RecommendationHandler != nil {
 					r.Post("/preferences", cfg.RecommendationHandler.HandleSetPreferences)
 					r.Get("/preferences", cfg.RecommendationHandler.HandleGetPreferences)
@@ -157,11 +166,26 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 		}
 
 		// Admin endpoints (require JWT + admin).
-		if cfg.JWTManager != nil && cfg.WalletHandler != nil && cfg.AdminChecker != nil {
+		if cfg.JWTManager != nil && cfg.AdminChecker != nil {
 			r.Route("/admin", func(r chi.Router) {
 				r.Use(AuthRequired(cfg.JWTManager))
 				r.Use(AdminRequired(cfg.AdminChecker))
-				r.Post("/wallet/adjust", cfg.WalletHandler.HandleAdminAdjust)
+
+				if cfg.WalletHandler != nil {
+					r.Post("/wallet/adjust", cfg.WalletHandler.HandleAdminAdjust)
+				}
+
+				// Order state management — for automation scripts and WMS
+				if cfg.OrderHandler != nil {
+					r.Post("/orders/{orderNumber}/state", cfg.OrderHandler.HandleAdminUpdateOrderState)
+				}
+
+				// Waybill management — for WMS system integration
+				if cfg.WaybillHandler != nil {
+					r.Post("/waybill/{waybillNo}/state", cfg.WaybillHandler.HandleAdminUpdateWaybillState)
+					r.Put("/waybill/{waybillNo}/shipping-fee", cfg.WaybillHandler.HandleAdminSetShippingFee)
+					r.Put("/waybill/{waybillNo}/shipping-info", cfg.WaybillHandler.HandleAdminSetShippingInfo)
+				}
 			})
 		}
 	})

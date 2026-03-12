@@ -238,7 +238,7 @@ func main() {
 
 		orderRepo := repo.NewOrderRepo(pgDB)
 		orderSvc := service.NewOrderService(esFetcher, walletRepo, orderRepo, cartRepo)
-		orderHandler = api.NewOrderHandler(orderSvc)
+		orderHandler = api.NewOrderHandler(orderSvc, orderRepo)
 
 		// Background: auto-cancel unpaid orders after 30 minutes.
 		go func() {

@@ -123,7 +123,7 @@ func TestHandleSettlement_Success(t *testing.T) {
 	}
 	walletStore := &orderMockWallet{wallet: &domain.Wallet{Balance: 100000}}
 	svc := service.NewOrderService(fetcher, walletStore, nil, nil)
-	h := NewOrderHandler(svc)
+	h := NewOrderHandler(svc, nil)
 
 	req := orderReq(http.MethodPost, "/order/settlement", `{"items":[{"product_id":"surugaya_001","quantity":1}]}`, 10)
 	rec := httptest.NewRecorder()
@@ -142,7 +142,7 @@ func TestHandleSettlement_Success(t *testing.T) {
 
 func TestHandleSettlement_EmptyItems(t *testing.T) {
 	svc := service.NewOrderService(nil, nil, nil, nil)
-	h := NewOrderHandler(svc)
+	h := NewOrderHandler(svc, nil)
 	req := orderReq(http.MethodPost, "/order/settlement", `{"items":[]}`, 10)
 	rec := httptest.NewRecorder()
 	h.HandleSettlement(rec, req)
@@ -155,7 +155,7 @@ func TestHandleSettlement_ProductNotFound(t *testing.T) {
 	fetcher := &mockProductFetcher{err: fmt.Errorf("not found")}
 	walletStore := &orderMockWallet{wallet: &domain.Wallet{Balance: 100000}}
 	svc := service.NewOrderService(fetcher, walletStore, nil, nil)
-	h := NewOrderHandler(svc)
+	h := NewOrderHandler(svc, nil)
 	req := orderReq(http.MethodPost, "/order/settlement", `{"items":[{"product_id":"bad_id","quantity":1}]}`, 10)
 	rec := httptest.NewRecorder()
 	h.HandleSettlement(rec, req)
@@ -180,7 +180,7 @@ func TestHandleConfirm_Success(t *testing.T) {
 	orderRepo := &mockOrderRepo{}
 	cartRemover := &mockCartRemover{}
 	svc := service.NewOrderService(fetcher, nil, orderRepo, cartRemover)
-	h := NewOrderHandler(svc)
+	h := NewOrderHandler(svc, nil)
 
 	req := orderReq(http.MethodPost, "/order/confirm", `{"items":[{"product_id":"surugaya_001","quantity":1}]}`, 10)
 	rec := httptest.NewRecorder()
@@ -214,7 +214,7 @@ func TestHandlePay_Success(t *testing.T) {
 		},
 	}
 	svc := service.NewOrderService(nil, walletStore, orderRepo, nil)
-	h := NewOrderHandler(svc)
+	h := NewOrderHandler(svc, nil)
 
 	req := orderReq(http.MethodPost, "/order/pay", `{"order_number":"RO20260304TEST"}`, 10)
 	rec := httptest.NewRecorder()
@@ -243,7 +243,7 @@ func TestHandlePay_InsufficientBalance(t *testing.T) {
 		},
 	}
 	svc := service.NewOrderService(nil, walletStore, orderRepo, nil)
-	h := NewOrderHandler(svc)
+	h := NewOrderHandler(svc, nil)
 
 	req := orderReq(http.MethodPost, "/order/pay", `{"order_number":"RO20260304TEST"}`, 10)
 	rec := httptest.NewRecorder()
@@ -259,7 +259,7 @@ func TestHandlePay_AlreadyPaid(t *testing.T) {
 		order: &domain.Order{ID: 1, OrderNumber: "RO_TEST", UserID: 10, OrderState: domain.OrderStatePaid},
 	}
 	svc := service.NewOrderService(nil, nil, orderRepo, nil)
-	h := NewOrderHandler(svc)
+	h := NewOrderHandler(svc, nil)
 
 	req := orderReq(http.MethodPost, "/order/pay", `{"order_number":"RO_TEST"}`, 10)
 	rec := httptest.NewRecorder()
@@ -283,7 +283,7 @@ func TestHandleGetOrder_Success(t *testing.T) {
 		},
 	}
 	svc := service.NewOrderService(nil, nil, orderRepo, nil)
-	h := NewOrderHandler(svc)
+	h := NewOrderHandler(svc, nil)
 
 	req := orderReqWithParam(http.MethodGet, "/order/RO_TEST", 10, map[string]string{"orderNumber": "RO_TEST"})
 	rec := httptest.NewRecorder()
@@ -309,7 +309,7 @@ func TestHandleGetOrder_WrongUser(t *testing.T) {
 		order: &domain.Order{ID: 1, OrderNumber: "RO_TEST", UserID: 99, CreatedAt: time.Now()},
 	}
 	svc := service.NewOrderService(nil, nil, orderRepo, nil)
-	h := NewOrderHandler(svc)
+	h := NewOrderHandler(svc, nil)
 
 	req := orderReqWithParam(http.MethodGet, "/order/RO_TEST", 10, map[string]string{"orderNumber": "RO_TEST"})
 	rec := httptest.NewRecorder()
@@ -330,7 +330,7 @@ func TestHandleListOrders_Success(t *testing.T) {
 		total: 2,
 	}
 	svc := service.NewOrderService(nil, nil, orderRepo, nil)
-	h := NewOrderHandler(svc)
+	h := NewOrderHandler(svc, nil)
 
 	req := orderReq(http.MethodGet, "/orders?page=1&page_size=20", "", 10)
 	rec := httptest.NewRecorder()
@@ -354,7 +354,7 @@ func TestHandleListOrders_Success(t *testing.T) {
 func TestHandleListOrders_Empty(t *testing.T) {
 	orderRepo := &mockOrderRepo{orders: nil, total: 0}
 	svc := service.NewOrderService(nil, nil, orderRepo, nil)
-	h := NewOrderHandler(svc)
+	h := NewOrderHandler(svc, nil)
 
 	req := orderReq(http.MethodGet, "/orders", "", 10)
 	rec := httptest.NewRecorder()
@@ -379,7 +379,7 @@ func TestHandleCancelOrder_Success(t *testing.T) {
 		order: &domain.Order{ID: 1, OrderNumber: "RO_TEST", UserID: 10, OrderState: domain.OrderStatePending, CreatedAt: time.Now()},
 	}
 	svc := service.NewOrderService(nil, nil, orderRepo, nil)
-	h := NewOrderHandler(svc)
+	h := NewOrderHandler(svc, nil)
 
 	req := orderReq(http.MethodPost, "/order/cancel", `{"order_number":"RO_TEST"}`, 10)
 	rec := httptest.NewRecorder()
@@ -401,7 +401,7 @@ func TestHandleCancelOrder_AlreadyPaid(t *testing.T) {
 		order: &domain.Order{ID: 1, OrderNumber: "RO_TEST", UserID: 10, OrderState: domain.OrderStatePaid, CreatedAt: time.Now()},
 	}
 	svc := service.NewOrderService(nil, nil, orderRepo, nil)
-	h := NewOrderHandler(svc)
+	h := NewOrderHandler(svc, nil)
 
 	req := orderReq(http.MethodPost, "/order/cancel", `{"order_number":"RO_TEST"}`, 10)
 	rec := httptest.NewRecorder()
