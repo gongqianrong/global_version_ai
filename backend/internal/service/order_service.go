@@ -127,6 +127,7 @@ type OrderResponse struct {
 	OrderInpriceJp   int64                 `json:"orderInpriceJp"`
 	OrderPaytype     int                   `json:"orderPaytype"`
 	OrderRemark      string                `json:"orderRemark"`
+	FirstGoodsImg    string                `json:"firstGoodsImg"`
 	OrderDetailList  []OrderDetailResponse `json:"orderDetailList,omitempty"`
 	CreatedAt        string                `json:"createdAt"`
 }
@@ -339,6 +340,11 @@ func (s *OrderService) GetDetail(ctx context.Context, userID int64, orderNumber 
 		})
 	}
 
+	firstImg := ""
+	if len(detailList) > 0 {
+		firstImg = detailList[0].GoodsImg
+	}
+
 	return &OrderResponse{
 		OrderNumber:     order.OrderNumber,
 		OrderState:      order.OrderState,
@@ -348,6 +354,7 @@ func (s *OrderService) GetDetail(ctx context.Context, userID int64, orderNumber 
 		OrderInpriceJp:  order.OrderInpriceJp,
 		OrderPaytype:    order.OrderPaytype,
 		OrderRemark:     order.OrderRemark,
+		FirstGoodsImg:   firstImg,
 		OrderDetailList: detailList,
 		CreatedAt:       order.CreatedAt.Format("2006-01-02 15:04:05"),
 	}, nil
@@ -391,6 +398,10 @@ func (s *OrderService) ListOrders(ctx context.Context, userID int64, state, page
 				State:         d.State,
 			})
 		}
+		firstImg := ""
+		if len(detailList) > 0 {
+			firstImg = detailList[0].GoodsImg
+		}
 		list = append(list, OrderResponse{
 			OrderNumber:     o.OrderNumber,
 			OrderState:      o.OrderState,
@@ -400,6 +411,7 @@ func (s *OrderService) ListOrders(ctx context.Context, userID int64, state, page
 			OrderInpriceJp:  o.OrderInpriceJp,
 			OrderPaytype:    o.OrderPaytype,
 			OrderRemark:     o.OrderRemark,
+			FirstGoodsImg:   firstImg,
 			OrderDetailList: detailList,
 			CreatedAt:       o.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
