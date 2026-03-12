@@ -22,6 +22,7 @@ type RouterConfig struct {
 	FavoriteHandler       *FavoriteHandler
 	SellerHandler         *SellerHandler
 	WalletHandler         *WalletHandler
+	RechargeHandler       *RechargeHandler
 	OrderHandler          *OrderHandler
 	RecommendationHandler *RecommendationHandler
 	AdminChecker          UserAdminChecker
@@ -78,6 +79,11 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 			})
 		})
 
+		// Payment callbacks (public, called by payment providers).
+		if cfg.RechargeHandler != nil {
+			r.Post("/wallet/recharge/callback/{method}", cfg.RechargeHandler.HandleRechargeCallback)
+		}
+
 		// Auth endpoints (public, no cache).
 		if cfg.AuthHandler != nil || cfg.OAuthHandler != nil {
 			r.Route("/auth", func(r chi.Router) {
@@ -122,6 +128,12 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 				if cfg.WalletHandler != nil {
 					r.Get("/wallet/balance", cfg.WalletHandler.HandleGetBalance)
 					r.Get("/wallet/transactions", cfg.WalletHandler.HandleListTransactions)
+				}
+
+				if cfg.RechargeHandler != nil {
+					r.Get("/wallet/pay-methods", cfg.RechargeHandler.HandleGetPayMethods)
+					r.Post("/wallet/recharge", cfg.RechargeHandler.HandleCreateRecharge)
+					r.Get("/wallet/recharge/{rechargeNo}", cfg.RechargeHandler.HandleGetRechargeStatus)
 				}
 
 				if cfg.OrderHandler != nil {
