@@ -1,6 +1,49 @@
 {
   "versions": [
     {
+      "version": "1.3.0",
+      "date": "2026-03-13",
+      "summary": "International waybill system, wallet recharge, and admin order/waybill management",
+      "changes": [
+        {
+          "type": "added",
+          "endpoints": [
+            "POST /api/v1/waybill/apply",
+            "GET /api/v1/waybills",
+            "GET /api/v1/waybill/{waybillNo}",
+            "POST /api/v1/waybill/{waybillNo}/pay-shipping",
+            "POST /api/v1/waybill/{waybillNo}/confirm-receipt"
+          ],
+          "description": "International waybill system: apply for shipment from warehoused orders, list/detail, pay shipping fee from wallet, confirm receipt. Waybill lifecycle: 待合单→待打包→待支付→待出库→已发货→已收货"
+        },
+        {
+          "type": "added",
+          "endpoints": [
+            "GET /api/v1/wallet/pay-methods",
+            "POST /api/v1/wallet/recharge",
+            "GET /api/v1/wallet/recharge/{rechargeNo}",
+            "POST /api/v1/wallet/recharge/callback/{method}"
+          ],
+          "description": "Wallet recharge system: query available payment methods, create recharge order, idempotent payment callback, status query. Amount range: 1,000~500,000 JPY"
+        },
+        {
+          "type": "added",
+          "endpoints": [
+            "POST /api/v1/admin/orders/{orderNumber}/state",
+            "POST /api/v1/admin/waybill/{waybillNo}/state",
+            "PUT /api/v1/admin/waybill/{waybillNo}/shipping-fee",
+            "PUT /api/v1/admin/waybill/{waybillNo}/shipping-info"
+          ],
+          "description": "Admin/WMS endpoints: automation script order state transitions (Paid→Purchasing→Warehoused), WMS waybill lifecycle management, shipping fee and tracking info"
+        },
+        {
+          "type": "modified",
+          "endpoints": ["GET /api/v1/orders", "GET /api/v1/order/{orderNumber}"],
+          "description": "OrderResponse now includes firstGoodsImg field for displaying the first item's image in order list"
+        }
+      ]
+    },
+    {
       "version": "1.2.0",
       "date": "2026-03-05",
       "summary": "User behavior analysis and personalized recommendation system",

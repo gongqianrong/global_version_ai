@@ -2,7 +2,7 @@ openapi: "3.0.3"
 info:
   title: Rakutao Collection Gateway API
   description: |
-    乐淘集运网关 API，提供商品搜索、购物车、收藏、关注卖家、钱包、订单等功能。
+    乐淘集运网关 API，提供商品搜索、购物车、收藏、关注卖家、钱包、订单、充值、国际运单等功能。
 
     ## 认证方式
     受保护的接口需要在请求头中携带 JWT Token：
@@ -25,7 +25,7 @@ info:
     ```
     - `code=0` 表示成功，`data` 包含业务数据
     - `code≠0` 表示错误，`message` 包含错误描述
-  version: "1.2.0"
+  version: "1.3.0"
 
 servers:
   - url: https://api.rakutao.vip
@@ -52,6 +52,10 @@ tags:
     description: 订单（需 JWT）
   - name: Recommendations
     description: 推荐系统（喜好设置、行为追踪、个性化推荐，需 JWT）
+  - name: Recharge
+    description: 钱包充值（支付方式查询、创建充值订单、回调处理，需 JWT）
+  - name: Waybill
+    description: 国际运单（申请发货、运单列表、支付运费、确认收货，需 JWT）
   - name: Admin
     description: 管理员接口（需 JWT + admin）
 
@@ -389,6 +393,10 @@ components:
           type: integer
         orderRemark:
           type: string
+        firstGoodsImg:
+          type: string
+          description: 订单第一件商品图片，列表页展示用
+          example: "https://img.example.com/goods/001.jpg"
         orderDetailList:
           type: array
           items:
@@ -469,6 +477,102 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RecommendedProduct"
+
+    PayMethodInfo:
+      type: object
+      properties:
+        method:
+          type: string
+          example: "wechat_pay"
+        name:
+          type: string
+          example: "微信支付"
+        available:
+          type: boolean
+          description: false 表示尚未对接，预留展示
+
+    RechargeOrder:
+      type: object
+      properties:
+        recharge_no:
+          type: string
+          example: "RC202603121530ABCD"
+        user_id:
+          type: integer
+          format: int64
+        amount_jpy:
+          type: integer
+          format: int64
+          example: 5000
+        pay_method:
+          type: string
+          example: "wechat_pay"
+        state:
+          type: integer
+          description: "0=待支付 1=已支付 2=支付失败"
+          example: 0
+        created_at:
+          type: string
+          format: date-time
+
+    Waybill:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        waybill_no:
+          type: string
+          example: "LO202603121530ABCD"
+        user_id:
+          type: integer
+          format: int64
+        state:
+          type: integer
+          description: "0=待合单 1=待打包 2=待支付 3=待出库 4=已发货 5=已收货"
+          example: 0
+        state_label:
+          type: string
+          example: "待合单"
+        shipping_fee_jpy:
+          type: integer
+          format: int64
+          description: 国际运费（打包后由仓库填写）
+          example: 3000
+        carrier:
+          type: string
+          description: 承运商
+          example: "EMS"
+        tracking_no:
+          type: string
+          description: 国际物流单号
+          example: "EJ000000000JP"
+        tracking_url:
+          type: string
+          description: 物流追踪链接
+        wms_waybill_no:
+          type: string
+          description: WMS系统运单号（预留对接）
+        remark:
+          type: string
+          description: 用户备注
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    WaybillOrder:
+      type: object
+      properties:
+        waybill_id:
+          type: integer
+          format: int64
+        waybill_no:
+          type: string
+        order_number:
+          type: string
 
 paths:
   # ────────── Public ──────────
@@ -1806,6 +1910,358 @@ paths:
                           page:
                             type: integer
 
+  # ────────── Recharge ──────────
+  /api/v1/wallet/pay-methods:
+    get:
+      tags: [Recharge]
+      summary: 获取支付方式列表
+      operationId: getPayMethods
+      security:
+        - BearerAuth: []
+      description: 返回所有支持的支付方式，available=false 表示预留待对接
+      responses:
+        "200":
+          description: 支付方式列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          methods:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/PayMethodInfo"
+
+  /api/v1/wallet/recharge:
+    post:
+      tags: [Recharge]
+      summary: 创建充值订单
+      operationId: createRecharge
+      security:
+        - BearerAuth: []
+      description: |
+        创建充值订单，返回支付跳转参数。
+        金额范围：1,000 ～ 500,000 日元。
+        支付方式须为 available=true 的方式。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount_jpy, pay_method]
+              properties:
+                amount_jpy:
+                  type: integer
+                  format: int64
+                  minimum: 1000
+                  maximum: 500000
+                  example: 5000
+                pay_method:
+                  type: string
+                  example: "wechat_pay"
+      responses:
+        "200":
+          description: 充值订单创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          recharge_no:
+                            type: string
+                            example: "RC202603121530ABCD"
+                          amount_jpy:
+                            type: integer
+                            format: int64
+                          pay_method:
+                            type: string
+                          state:
+                            type: integer
+                            example: 0
+                          pay_params:
+                            type: object
+                            description: 支付网关返回的跳转参数（各支付方式格式不同）
+        "400":
+          description: 金额超范围或支付方式不支持
+
+  /api/v1/wallet/recharge/{rechargeNo}:
+    get:
+      tags: [Recharge]
+      summary: 查询充值订单状态
+      operationId: getRechargeStatus
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: rechargeNo
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "RC202603121530ABCD"
+      responses:
+        "200":
+          description: 充值订单详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/RechargeOrder"
+        "404":
+          description: 订单不存在或不属于当前用户
+
+  /api/v1/wallet/recharge/callback/{method}:
+    post:
+      tags: [Recharge]
+      summary: 支付回调（支付网关调用）
+      operationId: rechargeCallback
+      description: |
+        供支付网关服务端回调，无需 JWT。
+        幂等设计：同一订单重复回调不重复处理。
+        回调成功后自动给用户钱包充值并将充值订单标记为已支付。
+      parameters:
+        - name: method
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 支付方式标识（如 wechat_pay / alipay）
+          example: "wechat_pay"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: 各支付网关的回调格式不同，由网关适配层解析
+      responses:
+        "200":
+          description: 回调处理成功
+
+  # ────────── Waybill ──────────
+  /api/v1/waybill/apply:
+    post:
+      tags: [Waybill]
+      summary: 申请国际发货（创建运单）
+      operationId: applyShipment
+      security:
+        - BearerAuth: []
+      description: |
+        用户选择一个或多个已入库订单，申请打包发往收货地址。
+        创建运单（state=待合单），关联订单状态更新为打包中。
+        所选订单必须均处于已入库（warehoused）状态。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order_numbers]
+              properties:
+                order_numbers:
+                  type: array
+                  items:
+                    type: string
+                  minItems: 1
+                  example: ["RO202603120001", "RO202603120002"]
+                remark:
+                  type: string
+                  description: 用户备注（如：请勿折叠）
+                  example: "请勿折叠"
+      responses:
+        "200":
+          description: 运单创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Waybill"
+        "400":
+          description: 订单未入库或不属于当前用户
+
+  /api/v1/waybills:
+    get:
+      tags: [Waybill]
+      summary: 运单列表
+      operationId: listWaybills
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        "200":
+          description: 运单列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/Waybill"
+                          total:
+                            type: integer
+                            format: int64
+                          page:
+                            type: integer
+
+  /api/v1/waybill/{waybillNo}:
+    get:
+      tags: [Waybill]
+      summary: 运单详情
+      operationId: getWaybill
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: waybillNo
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "LO202603121530ABCD"
+      responses:
+        "200":
+          description: 运单详情及关联订单
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          waybill:
+                            $ref: "#/components/schemas/Waybill"
+                          orders:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/WaybillOrder"
+        "404":
+          description: 运单不存在或不属于当前用户
+
+  /api/v1/waybill/{waybillNo}/pay-shipping:
+    post:
+      tags: [Waybill]
+      summary: 支付国际运费
+      operationId: payShippingFee
+      security:
+        - BearerAuth: []
+      description: |
+        从钱包余额扣除国际运费，运单状态从待支付变为待出库。
+        运费由仓库打包完成后填写，可在运单详情中查看 shipping_fee_jpy。
+      parameters:
+        - name: waybillNo
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 支付成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          waybill_no:
+                            type: string
+                          state:
+                            type: integer
+                            example: 3
+                          state_label:
+                            type: string
+                            example: "待出库"
+                          balance_after:
+                            type: integer
+                            format: int64
+        "400":
+          description: 运单状态不是待支付，或余额不足
+        "404":
+          description: 运单不存在
+
+  /api/v1/waybill/{waybillNo}/confirm-receipt:
+    post:
+      tags: [Waybill]
+      summary: 确认收货
+      operationId: confirmReceipt
+      security:
+        - BearerAuth: []
+      description: |
+        用户确认收到国际包裹，运单状态从已发货变为已收货。
+        同时将关联订单状态更新为已完成（fulfilled）。
+      parameters:
+        - name: waybillNo
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 确认收货成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          waybill_no:
+                            type: string
+                          state:
+                            type: integer
+                            example: 5
+                          state_label:
+                            type: string
+                            example: "已收货"
+        "400":
+          description: 运单尚未发货，不可确认收货
+        "404":
+          description: 运单不存在
+
   # ────────── Admin ──────────
   /api/v1/admin/wallet/adjust:
     post:
@@ -1856,6 +2312,217 @@ paths:
                           transaction_id:
                             type: integer
                             format: int64
+
+  /api/v1/admin/orders/{orderNumber}/state:
+    post:
+      tags: [Admin]
+      summary: 更新订单状态（自动化脚本专用）
+      operationId: adminUpdateOrderState
+      security:
+        - BearerAuth: []
+      description: |
+        供自动化采购脚本和 WMS 驱动订单状态流转：
+        - 已支付(1) → 采购中(2)：自动化脚本在日本平台采购成功后回写
+        - 采购中(2) → 已入库(3)：WMS 扫码入库后回写
+
+        非法跳跃（如 1→3）将被拒绝。
+      parameters:
+        - name: orderNumber
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [state]
+              properties:
+                state:
+                  type: integer
+                  description: "目标状态：2=采购中 3=已入库"
+                  example: 2
+      responses:
+        "200":
+          description: 状态更新成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          order_number:
+                            type: string
+                          state:
+                            type: integer
+        "400":
+          description: 非法状态转移
+        "404":
+          description: 订单不存在
+
+  /api/v1/admin/waybill/{waybillNo}/state:
+    post:
+      tags: [Admin]
+      summary: 更新运单状态（WMS 专用）
+      operationId: adminUpdateWaybillState
+      security:
+        - BearerAuth: []
+      description: |
+        供 WMS 系统驱动运单状态流转（严格顺序）：
+        - 待合单(0) → 待打包(1)：合单完成
+        - 待打包(1) → 待支付(2)：打包完成，自动同步关联订单状态为 Packed，用户可支付运费
+        - 待支付(2) → 待出库(3)：用户支付运费后（由 pay-shipping 接口触发）
+        - 待出库(3) → 已发货(4)：仓库出库，自动同步关联订单状态为 Shipped
+        - 已发货(4) → 已收货(5)：用户确认收货（由 confirm-receipt 接口触发）
+
+        非法跳跃将被拒绝。
+      parameters:
+        - name: waybillNo
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [state]
+              properties:
+                state:
+                  type: integer
+                  description: "目标状态（见说明）"
+                  example: 1
+      responses:
+        "200":
+          description: 状态更新成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          waybill_no:
+                            type: string
+                          state:
+                            type: integer
+                          state_label:
+                            type: string
+        "400":
+          description: 非法状态转移
+        "404":
+          description: 运单不存在
+
+  /api/v1/admin/waybill/{waybillNo}/shipping-fee:
+    put:
+      tags: [Admin]
+      summary: 设置国际运费（WMS 打包完成后填写）
+      operationId: adminSetShippingFee
+      security:
+        - BearerAuth: []
+      description: WMS 打包完成称重后，填写实际国际运费，用户据此支付。
+      parameters:
+        - name: waybillNo
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shipping_fee_jpy]
+              properties:
+                shipping_fee_jpy:
+                  type: integer
+                  format: int64
+                  minimum: 1
+                  example: 3500
+      responses:
+        "200":
+          description: 运费设置成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          waybill_no:
+                            type: string
+                          shipping_fee_jpy:
+                            type: integer
+                            format: int64
+
+  /api/v1/admin/waybill/{waybillNo}/shipping-info:
+    put:
+      tags: [Admin]
+      summary: 填写物流信息（WMS 发货时填写）
+      operationId: adminSetShippingInfo
+      security:
+        - BearerAuth: []
+      description: WMS 实际发货时填写承运商和物流单号，前端用于展示物流追踪。
+      parameters:
+        - name: waybillNo
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [carrier, tracking_no]
+              properties:
+                carrier:
+                  type: string
+                  example: "EMS"
+                tracking_no:
+                  type: string
+                  example: "EJ000000000JP"
+                tracking_url:
+                  type: string
+                  example: "https://trackings.post.japanpost.jp/services/srv/search/?requestNo=EJ000000000JP"
+                wms_waybill_no:
+                  type: string
+                  description: WMS 系统内部运单号（预留对接）
+      responses:
+        "200":
+          description: 物流信息填写成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          waybill_no:
+                            type: string
+                          carrier:
+                            type: string
+                          tracking_no:
+                            type: string
 
   # ────────── Recommendations ──────────
   /api/v1/preferences:
