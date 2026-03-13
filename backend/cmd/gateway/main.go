@@ -196,6 +196,8 @@ func main() {
 		favoriteHandler       *api.FavoriteHandler
 		sellerHandler         *api.SellerHandler
 		walletHandler         *api.WalletHandler
+		rechargeHandler       *api.RechargeHandler
+		waybillHandler        *api.WaybillHandler
 		orderHandler          *api.OrderHandler
 		recommendationHandler *api.RecommendationHandler
 		adminChecker          api.UserAdminChecker
@@ -239,6 +241,12 @@ func main() {
 		orderRepo := repo.NewOrderRepo(pgDB)
 		orderSvc := service.NewOrderService(esFetcher, walletRepo, orderRepo, cartRepo)
 		orderHandler = api.NewOrderHandler(orderSvc, orderRepo)
+
+		waybillRepo := repo.NewWaybillRepo(pgDB)
+		waybillHandler = api.NewWaybillHandler(waybillRepo, waybillRepo, walletRepo)
+
+		rechargeRepo := repo.NewRechargeRepo(pgDB)
+		rechargeHandler = api.NewRechargeHandler(rechargeRepo, walletRepo, nil)
 
 		// Background: auto-cancel unpaid orders after 30 minutes.
 		go func() {
@@ -309,6 +317,8 @@ func main() {
 		FavoriteHandler:       favoriteHandler,
 		SellerHandler:         sellerHandler,
 		WalletHandler:         walletHandler,
+		RechargeHandler:       rechargeHandler,
+		WaybillHandler:        waybillHandler,
 		OrderHandler:          orderHandler,
 		RecommendationHandler: recommendationHandler,
 		AdminChecker:          adminChecker,
