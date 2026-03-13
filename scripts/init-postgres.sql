@@ -153,3 +153,53 @@ CREATE TABLE IF NOT EXISTS user_rec_weights (
     UNIQUE(user_id, signal_type, dimension, value)
 );
 CREATE INDEX IF NOT EXISTS idx_rec_weights_user ON user_rec_weights(user_id);
+
+-- ------------------------------------------------------------
+-- v1.3.0: 充值订单表
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS recharge_orders (
+    id           BIGSERIAL    PRIMARY KEY,
+    recharge_no  VARCHAR(64)  NOT NULL UNIQUE,
+    user_id      BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    amount_jpy   BIGINT       NOT NULL CHECK (amount_jpy > 0),
+    pay_method   VARCHAR(50)  NOT NULL,
+    state        INT          NOT NULL DEFAULT 0,  -- 0=待支付 1=已支付 2=支付失败
+    created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_recharge_orders_user ON recharge_orders(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_recharge_orders_no   ON recharge_orders(recharge_no);
+
+-- ------------------------------------------------------------
+-- v1.3.0: 国际运单表
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS waybills (
+    id               BIGSERIAL    PRIMARY KEY,
+    waybill_no       VARCHAR(64)  NOT NULL UNIQUE,
+    user_id          BIGINT       NOT NULL REFERENCES users(id),
+    state            INT          NOT NULL DEFAULT 0,
+    -- 0=待合单 1=待打包 2=待支付 3=待出库 4=已发货 5=已收货
+    shipping_fee_jpy BIGINT       NOT NULL DEFAULT 0,
+    carrier          VARCHAR(100) NOT NULL DEFAULT '',
+    tracking_no      VARCHAR(100) NOT NULL DEFAULT '',
+    tracking_url     TEXT         NOT NULL DEFAULT '',
+    wms_waybill_no   VARCHAR(100) NOT NULL DEFAULT '',
+    remark           TEXT         NOT NULL DEFAULT '',
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_waybills_user ON waybills(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_waybills_no   ON waybills(waybill_no);
+
+-- ------------------------------------------------------------
+-- v1.3.0: 运单关联订单表（一个运单可合并多个订单）
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS waybill_orders (
+    id           BIGSERIAL    PRIMARY KEY,
+    waybill_id   BIGINT       NOT NULL REFERENCES waybills(id) ON DELETE CASCADE,
+    waybill_no   VARCHAR(64)  NOT NULL,
+    order_number VARCHAR(64)  NOT NULL REFERENCES orders(order_number),
+    UNIQUE(waybill_no, order_number)
+);
+CREATE INDEX IF NOT EXISTS idx_waybill_orders_waybill ON waybill_orders(waybill_id);
+CREATE INDEX IF NOT EXISTS idx_waybill_orders_order   ON waybill_orders(order_number);
