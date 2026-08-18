@@ -8,6 +8,9 @@ RUN apk add --no-cache git ca-certificates tzdata
 
 WORKDIR /build
 
+# Enable Go toolchain auto-download for dependencies requiring newer versions
+ENV GOTOOLCHAIN=auto
+
 # Copy go mod files first for better caching
 COPY go.mod go.sum ./
 RUN go mod download
