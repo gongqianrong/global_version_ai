@@ -165,14 +165,14 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 				}
 
 				if cfg.OrderLinkHandler != nil {
-				r.Post("/order-link/submit", cfg.OrderLinkHandler.HandleSubmitOrderLink)
-				r.Get("/order-links", cfg.OrderLinkHandler.HandleListOrderLinks)
-				r.Get("/order-link/{linkNo}", cfg.OrderLinkHandler.HandleGetOrderLink)
-				r.Post("/order-link/{linkNo}/pay", cfg.OrderLinkHandler.HandlePayOrderLink)
-				r.Post("/order-link/{linkNo}/cancel", cfg.OrderLinkHandler.HandleCancelOrderLink)
-			}
+					r.Post("/order-link/submit", cfg.OrderLinkHandler.HandleSubmitOrderLink)
+					r.Get("/order-links", cfg.OrderLinkHandler.HandleListOrderLinks)
+					r.Get("/order-link/{linkNo}", cfg.OrderLinkHandler.HandleGetOrderLink)
+					r.Post("/order-link/{linkNo}/pay", cfg.OrderLinkHandler.HandlePayOrderLink)
+					r.Post("/order-link/{linkNo}/cancel", cfg.OrderLinkHandler.HandleCancelOrderLink)
+				}
 
-			if cfg.RecommendationHandler != nil {
+				if cfg.RecommendationHandler != nil {
 					r.Post("/preferences", cfg.RecommendationHandler.HandleSetPreferences)
 					r.Get("/preferences", cfg.RecommendationHandler.HandleGetPreferences)
 					r.Post("/track/view", cfg.RecommendationHandler.HandleTrackView)
@@ -199,12 +199,12 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 				}
 
 				// Order Link management
-			if cfg.OrderLinkHandler != nil {
-				r.Post("/order-link/{linkNo}/quote", cfg.OrderLinkHandler.HandleAdminQuoteOrderLink)
-				r.Post("/order-link/{linkNo}/cancel", cfg.OrderLinkHandler.HandleAdminCancelOrderLink)
-			}
+				if cfg.OrderLinkHandler != nil {
+					r.Post("/order-link/{linkNo}/quote", cfg.OrderLinkHandler.HandleAdminQuoteOrderLink)
+					r.Post("/order-link/{linkNo}/cancel", cfg.OrderLinkHandler.HandleAdminCancelOrderLink)
+				}
 
-			// Waybill management — for WMS system integration
+				// Waybill management — for WMS system integration
 				if cfg.WaybillHandler != nil {
 					r.Post("/waybill/{waybillNo}/state", cfg.WaybillHandler.HandleAdminUpdateWaybillState)
 					r.Put("/waybill/{waybillNo}/shipping-fee", cfg.WaybillHandler.HandleAdminSetShippingFee)
