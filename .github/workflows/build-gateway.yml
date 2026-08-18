@@ -7,6 +7,7 @@ on:
       - 'backend/**/*.go'
       - 'backend/go.mod'
       - 'backend/go.sum'
+      - '.github/workflows/build-gateway.yml'
   workflow_dispatch:
 
 jobs:
@@ -21,22 +22,25 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24'
+          go-version-file: 'backend/go.mod'
 
       - name: Build Linux binary
         working-directory: ./backend
         run: |
+          mkdir -p bin
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
             go build -ldflags="-s -w" -trimpath \
-            -o gateway-linux ./cmd/gateway
+            -o bin/gateway-linux-amd64 ./cmd/gateway
           
-          ls -lh gateway-linux
-          file gateway-linux
+          ls -lh bin/gateway-linux-amd64
+          file bin/gateway-linux-amd64
+          echo "Binary size: $(du -h bin/gateway-linux-amd64 | cut -f1)"
 
       - name: Check if binary changed
         id: check_changes
         run: |
-          if git diff --quiet backend/gateway-linux; then
+          if git diff --quiet backend/bin/gateway-linux-amd64 2>/dev/null; then
             echo "changed=false" >> $GITHUB_OUTPUT
           else
             echo "changed=true" >> $GITHUB_OUTPUT
@@ -47,6 +51,7 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add backend/gateway-linux
-          git commit -m "build: 自动编译gateway-linux [skip ci]"
+          git add backend/bin/gateway-linux-amd64
+          BINARY_SIZE=$(du -h backend/bin/gateway-linux-amd64 | cut -f1)
+          git commit -m "build: 自动编译gateway二进制 (${BINARY_SIZE}) [skip ci]"
           git push

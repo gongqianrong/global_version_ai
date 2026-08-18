@@ -9,6 +9,7 @@
 # Go
 backend/gateway
 backend/bin/
+!backend/bin/gateway-linux-amd64
 
 # Python
 __pycache__/

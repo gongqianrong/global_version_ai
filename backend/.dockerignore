@@ -6,12 +6,13 @@
 *.md
 docs/
 
-# Build artifacts
+# Build artifacts (except pre-built binaries in bin/)
 gateway
 gateway-linux
 *.out
 *.test
 *.prof
+!bin/gateway-linux-amd64
 
 # IDE
 .vscode

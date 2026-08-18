@@ -1,0 +1,32 @@
+# ============================================
+# Dockerfile for pre-built binary
+# Use this when the binary is already compiled and committed to git
+# ============================================
+FROM alpine:3.19
+
+# Install runtime dependencies
+RUN apk add --no-cache ca-certificates tzdata wget postgresql-client
+
+WORKDIR /app
+
+# Copy pre-built binary from repository
+COPY bin/gateway-linux-amd64 /app/gateway
+RUN chmod +x /app/gateway
+
+# Copy migration scripts
+COPY scripts/migrations /app/migrations
+
+# Copy entrypoint script
+COPY docker-entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Set timezone
+ENV TZ=Asia/Shanghai
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=10s --timeout=5s --retries=3 \
+  CMD wget -qO- http://localhost:8080/health || exit 1
+
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["/app/gateway"]
