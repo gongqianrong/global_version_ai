@@ -13,7 +13,7 @@ const swaggerHTML = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <title>Rakutao API Documentation</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui.min.css">
+  <link rel="stylesheet" href="./swagger-ui.min.css">
   <style>
     html { box-sizing: border-box; overflow-y: scroll; }
     *, *:before, *:after { box-sizing: inherit; }
@@ -72,7 +72,7 @@ const swaggerHTML = `<!DOCTYPE html>
   </div>
   <div class="changelog-panel" id="changelogPanel"></div>
   <div id="swagger-ui"></div>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui-bundle.min.js"></script>
+  <script src="./swagger-ui-bundle.min.js"></script>
   <script>
     SwaggerUIBundle({
       url: './openapi.yaml',
