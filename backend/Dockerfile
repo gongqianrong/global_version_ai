@@ -18,8 +18,8 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build with optimizations
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+# Build with optimizations (GOTOOLCHAIN=auto allows automatic version upgrade)
+RUN GOTOOLCHAIN=auto CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     go build -ldflags="-s -w" -trimpath \
     -o gateway ./cmd/gateway
 
