@@ -234,8 +234,14 @@ func (r *OrderRepo) PayOrderAtomic(
 	orderNumber string,
 	userID int64,
 	amount int64,
-	walletRepo *WalletRepo,
+	walletRepo interface{},
 ) (*domain.WalletTransaction, error) {
+	// Type assert to WalletRepo
+	wr, ok := walletRepo.(*WalletRepo)
+	if !ok {
+		return nil, fmt.Errorf("order_repo: invalid wallet repository type")
+	}
+	
 	tx, err := r.db.Pool.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("order_repo: begin payment tx: %w", err)
@@ -245,7 +251,7 @@ func (r *OrderRepo) PayOrderAtomic(
 	// Step 1: Deduct wallet balance (within this transaction)
 	debitAmount := -amount
 	desc := fmt.Sprintf("Order %s payment", orderNumber)
-	wtx, err := walletRepo.AdjustWithTx(ctx, tx, userID, debitAmount, domain.TxTypePurchase, desc, &orderNumber)
+	wtx, err := wr.AdjustWithTx(ctx, tx, userID, debitAmount, domain.TxTypePurchase, desc, &orderNumber)
 	if err != nil {
 		return nil, fmt.Errorf("order_repo: payment deduct wallet: %w", err)
 	}
