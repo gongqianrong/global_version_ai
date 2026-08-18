@@ -18,6 +18,9 @@ RUN go mod download
 # Copy source code
 COPY . .
 
+# Tidy dependencies with the downloaded Go version
+RUN go mod tidy
+
 # Build with optimizations (GOTOOLCHAIN=auto allows automatic version upgrade)
 RUN GOTOOLCHAIN=auto CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     go build -ldflags="-s -w" -trimpath \
