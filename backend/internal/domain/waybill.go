@@ -58,11 +58,22 @@ type WaybillOrder struct {
 	OrderNumber string `json:"order_number"`
 }
 
-// GenerateWaybillNo creates a unique waybill number: LO + timestamp + 4 random hex chars.
+// GenerateWaybillNo creates a unique waybill number: LO + timestamp (microsecond) + 8 random hex chars.
+// Format: LO20260102150405123456ABCD1234 (prefix + YYYYMMDDHHmmssμs + random)
 func GenerateWaybillNo() string {
-	b := make([]byte, 2)
-	rand.Read(b)
-	return fmt.Sprintf("LO%s%X", time.Now().Format("20060102150405"), b)
+	b := make([]byte, 4)
+	if _, err := rand.Read(b); err != nil {
+		nanos := time.Now().UnixNano()
+		b[0] = byte(nanos >> 24)
+		b[1] = byte(nanos >> 16)
+		b[2] = byte(nanos >> 8)
+		b[3] = byte(nanos)
+	}
+	now := time.Now()
+	return fmt.Sprintf("LO%s%06d%X", 
+		now.Format("20060102150405"), 
+		now.Nanosecond()/1000,
+		b)
 }
 
 // ValidWaybillStateTransitions defines allowed state transitions.

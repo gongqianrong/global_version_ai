@@ -203,3 +203,33 @@ CREATE TABLE IF NOT EXISTS waybill_orders (
 );
 CREATE INDEX IF NOT EXISTS idx_waybill_orders_waybill ON waybill_orders(waybill_id);
 CREATE INDEX IF NOT EXISTS idx_waybill_orders_order   ON waybill_orders(order_number);
+
+-- ------------------------------------------------------------
+-- v1.4.0: 指定购买（Order Link）
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS order_links (
+    id            BIGSERIAL    PRIMARY KEY,
+    link_no       VARCHAR(64)  NOT NULL UNIQUE,
+    user_id       BIGINT       NOT NULL REFERENCES users(id),
+    state         INT          NOT NULL DEFAULT 0,  -- 0=待报价 1=已报价 2=已支付 3=已取消
+    total_amount  BIGINT       NOT NULL DEFAULT 0,  -- 报价总金额 JPY
+    order_number  VARCHAR(64)  DEFAULT NULL,         -- 支付后关联的真实订单号
+    remark        TEXT         NOT NULL DEFAULT '',
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_order_links_user ON order_links(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_order_links_no   ON order_links(link_no);
+
+CREATE TABLE IF NOT EXISTS order_link_items (
+    id            BIGSERIAL    PRIMARY KEY,
+    order_link_id BIGINT       NOT NULL REFERENCES order_links(id) ON DELETE CASCADE,
+    goods_url     TEXT         NOT NULL,
+    goods_name    TEXT         NOT NULL DEFAULT '',
+    goods_img     TEXT         NOT NULL DEFAULT '',
+    quantity      INT          NOT NULL DEFAULT 1 CHECK (quantity > 0),
+    unit_price    BIGINT       NOT NULL DEFAULT 0,  -- 管理员报价时填入
+    remark        TEXT         NOT NULL DEFAULT '',
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_order_link_items_link ON order_link_items(order_link_id);

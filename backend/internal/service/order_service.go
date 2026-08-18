@@ -268,6 +268,7 @@ func (s *OrderService) Confirm(ctx context.Context, userID int64, items []OrderI
 }
 
 // Pay deducts wallet balance for a pending order and transitions it to Paid state.
+// FIXED: Now uses atomic transaction to ensure consistency.
 func (s *OrderService) Pay(ctx context.Context, userID int64, orderNumber string) (*PayResult, error) {
 	// Fetch order and verify ownership + state.
 	order, _, err := s.orders.GetByOrderNumber(ctx, orderNumber)
@@ -281,7 +282,7 @@ func (s *OrderService) Pay(ctx context.Context, userID int64, orderNumber string
 		return nil, ErrOrderNotPayable
 	}
 
-	// Check wallet balance.
+	// Check wallet balance before attempting payment.
 	wallet, err := s.wallet.GetOrCreateWallet(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("order_service: get wallet: %w", err)
@@ -290,17 +291,24 @@ func (s *OrderService) Pay(ctx context.Context, userID int64, orderNumber string
 		return nil, ErrInsufficientBalance
 	}
 
-	// Deduct wallet.
-	debitAmount := -order.OrderInpriceJp
-	desc := fmt.Sprintf("Order %s payment", orderNumber)
-	wtx, err := s.wallet.Adjust(ctx, userID, debitAmount, domain.TxTypePurchase, desc, &orderNumber)
-	if err != nil {
-		return nil, fmt.Errorf("order_service: deduct wallet: %w", err)
+	// CRITICAL FIX: Atomic payment using PayOrderAtomic
+	// This ensures wallet deduction and order state update happen in ONE transaction.
+	// If either fails, both are rolled back - no partial success.
+	type AtomicPaymentRepo interface {
+		PayOrderAtomic(ctx context.Context, orderNumber string, userID int64, amount int64, walletRepo interface {
+			AdjustWithTx(ctx context.Context, tx interface{}, userID int64, amount int64, txType, description string, relatedOrder *string) (*domain.WalletTransaction, error)
+		}) (*domain.WalletTransaction, error)
 	}
 
-	// Update order state to Paid.
-	if err := s.orders.UpdateState(ctx, orderNumber, domain.OrderStatePending, domain.OrderStatePaid); err != nil {
-		return nil, fmt.Errorf("order_service: update state: %w", err)
+	atomicRepo, ok := s.orders.(AtomicPaymentRepo)
+	if !ok {
+		// Fallback to old implementation (should not happen after migration)
+		return nil, fmt.Errorf("order_service: order repository does not support atomic payment")
+	}
+
+	wtx, err := atomicRepo.PayOrderAtomic(ctx, orderNumber, userID, order.OrderInpriceJp, s.wallet)
+	if err != nil {
+		return nil, fmt.Errorf("order_service: atomic payment failed: %w", err)
 	}
 
 	return &PayResult{

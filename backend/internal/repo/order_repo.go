@@ -125,6 +125,23 @@ func (r *OrderRepo) UpdateState(ctx context.Context, orderNumber string, fromSta
 	return nil
 }
 
+// UpdateStateWithTx updates order state within an existing transaction.
+// CRITICAL: Caller must manage the transaction lifecycle (commit/rollback).
+func (r *OrderRepo) UpdateStateWithTx(ctx context.Context, tx pgx.Tx, orderNumber string, fromState, toState int) error {
+	tag, err := tx.Exec(ctx,
+		`UPDATE orders SET order_state = $1, updated_at = NOW()
+		 WHERE order_number = $2 AND order_state = $3`,
+		toState, orderNumber, fromState,
+	)
+	if err != nil {
+		return fmt.Errorf("order_repo: update_state: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
 // ListByUser returns paginated orders for a user, optionally filtered by state.
 // Pass state < 0 to skip state filtering.
 func (r *OrderRepo) ListByUser(ctx context.Context, userID int64, state, limit, offset int) ([]domain.Order, int64, error) {
@@ -207,4 +224,43 @@ func (r *OrderRepo) CancelExpired(ctx context.Context, timeout time.Duration) (i
 		return 0, fmt.Errorf("order_repo: cancel_expired: %w", err)
 	}
 	return tag.RowsAffected(), nil
+}
+
+// PayOrderAtomic performs atomic payment: deduct wallet + update order state in ONE transaction.
+// This is the CRITICAL FIX for P0 payment transaction consistency issue.
+// Returns the wallet transaction and updated order state on success.
+func (r *OrderRepo) PayOrderAtomic(
+	ctx context.Context,
+	orderNumber string,
+	userID int64,
+	amount int64,
+	walletRepo interface {
+		AdjustWithTx(ctx context.Context, tx pgx.Tx, userID int64, amount int64, txType, description string, relatedOrder *string) (*domain.WalletTransaction, error)
+	},
+) (*domain.WalletTransaction, error) {
+	tx, err := r.db.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("order_repo: begin payment tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Step 1: Deduct wallet balance (within this transaction)
+	debitAmount := -amount
+	desc := fmt.Sprintf("Order %s payment", orderNumber)
+	wtx, err := walletRepo.AdjustWithTx(ctx, tx, userID, debitAmount, domain.TxTypePurchase, desc, &orderNumber)
+	if err != nil {
+		return nil, fmt.Errorf("order_repo: payment deduct wallet: %w", err)
+	}
+
+	// Step 2: Update order state to Paid (within same transaction)
+	if err := r.UpdateStateWithTx(ctx, tx, orderNumber, domain.OrderStatePending, domain.OrderStatePaid); err != nil {
+		return nil, fmt.Errorf("order_repo: payment update state: %w", err)
+	}
+
+	// Step 3: Commit transaction (both operations succeed or both fail)
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("order_repo: payment commit: %w", err)
+	}
+
+	return wtx, nil
 }

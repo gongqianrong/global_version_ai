@@ -25,6 +25,8 @@ type RouterConfig struct {
 	RechargeHandler       *RechargeHandler
 	WaybillHandler        *WaybillHandler
 	OrderHandler          *OrderHandler
+	OrderLinkHandler      *OrderLinkHandler
+	GlobalOrderHandler    *GlobalOrderHandler
 	RecommendationHandler *RecommendationHandler
 	AdminChecker          UserAdminChecker
 	JWTManager            *auth.JWTManager
@@ -83,6 +85,14 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 		// Payment callbacks (public, called by payment providers).
 		if cfg.RechargeHandler != nil {
 			r.Post("/wallet/recharge/callback/{method}", cfg.RechargeHandler.HandleRechargeCallback)
+		}
+
+		// Global order sync (internal, called by international version).
+		if cfg.GlobalOrderHandler != nil {
+			r.Route("/internal/global/order", func(r chi.Router) {
+				r.Post("/sync", cfg.GlobalOrderHandler.HandleSync)
+				r.Post("/payment-success", cfg.GlobalOrderHandler.HandlePaymentSuccess)
+			})
 		}
 
 		// Auth endpoints (public, no cache).
@@ -154,7 +164,15 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 					r.Post("/waybill/{waybillNo}/confirm-receipt", cfg.WaybillHandler.HandleConfirmReceipt)
 				}
 
-				if cfg.RecommendationHandler != nil {
+				if cfg.OrderLinkHandler != nil {
+				r.Post("/order-link/submit", cfg.OrderLinkHandler.HandleSubmitOrderLink)
+				r.Get("/order-links", cfg.OrderLinkHandler.HandleListOrderLinks)
+				r.Get("/order-link/{linkNo}", cfg.OrderLinkHandler.HandleGetOrderLink)
+				r.Post("/order-link/{linkNo}/pay", cfg.OrderLinkHandler.HandlePayOrderLink)
+				r.Post("/order-link/{linkNo}/cancel", cfg.OrderLinkHandler.HandleCancelOrderLink)
+			}
+
+			if cfg.RecommendationHandler != nil {
 					r.Post("/preferences", cfg.RecommendationHandler.HandleSetPreferences)
 					r.Get("/preferences", cfg.RecommendationHandler.HandleGetPreferences)
 					r.Post("/track/view", cfg.RecommendationHandler.HandleTrackView)
@@ -180,7 +198,13 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 					r.Post("/orders/{orderNumber}/state", cfg.OrderHandler.HandleAdminUpdateOrderState)
 				}
 
-				// Waybill management — for WMS system integration
+				// Order Link management
+			if cfg.OrderLinkHandler != nil {
+				r.Post("/order-link/{linkNo}/quote", cfg.OrderLinkHandler.HandleAdminQuoteOrderLink)
+				r.Post("/order-link/{linkNo}/cancel", cfg.OrderLinkHandler.HandleAdminCancelOrderLink)
+			}
+
+			// Waybill management — for WMS system integration
 				if cfg.WaybillHandler != nil {
 					r.Post("/waybill/{waybillNo}/state", cfg.WaybillHandler.HandleAdminUpdateWaybillState)
 					r.Put("/waybill/{waybillNo}/shipping-fee", cfg.WaybillHandler.HandleAdminSetShippingFee)

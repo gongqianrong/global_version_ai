@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/rakutao/collection-gateway/internal/db"
 	"github.com/rakutao/collection-gateway/internal/domain"
 )
@@ -80,6 +81,43 @@ func (r *WalletRepo) Adjust(ctx context.Context, userID int64, amount int64, txT
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("wallet_repo: commit: %w", err)
 	}
+	return &wt, nil
+}
+
+// AdjustWithTx atomically updates wallet balance within an existing transaction.
+// This allows wallet operations to be part of a larger transactional unit.
+// CRITICAL: Caller must manage the transaction lifecycle (commit/rollback).
+func (r *WalletRepo) AdjustWithTx(ctx context.Context, tx pgx.Tx, userID int64, amount int64, txType, description string, relatedOrder *string) (*domain.WalletTransaction, error) {
+	// Ensure wallet exists and lock the row.
+	var newBalance int64
+	err := tx.QueryRow(ctx,
+		`INSERT INTO wallets (user_id) VALUES ($1)
+		 ON CONFLICT (user_id) DO UPDATE SET
+		   balance = wallets.balance + $2,
+		   updated_at = NOW()
+		 RETURNING balance`,
+		userID, amount,
+	).Scan(&newBalance)
+	if err != nil {
+		return nil, fmt.Errorf("wallet_repo: update balance: %w", err)
+	}
+
+	if newBalance < 0 {
+		return nil, ErrInsufficientBalance
+	}
+
+	// Insert transaction record.
+	var wt domain.WalletTransaction
+	err = tx.QueryRow(ctx,
+		`INSERT INTO wallet_transactions (user_id, type, amount, balance_after, description, related_order)
+		 VALUES ($1, $2, $3, $4, $5, $6)
+		 RETURNING id, user_id, type, amount, balance_after, description, related_order, created_at`,
+		userID, txType, amount, newBalance, description, relatedOrder,
+	).Scan(&wt.ID, &wt.UserID, &wt.Type, &wt.Amount, &wt.BalanceAfter, &wt.Description, &wt.RelatedOrder, &wt.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("wallet_repo: insert tx: %w", err)
+	}
+
 	return &wt, nil
 }
 

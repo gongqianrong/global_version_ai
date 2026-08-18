@@ -20,6 +20,12 @@ const (
 	OrderStateRefunded   = 9
 )
 
+// Order purchase type constants.
+const (
+	OrderPurchaseTypeNormal    = 1
+	OrderPurchaseTypeOrderLink = 2
+)
+
 // Order represents a row in the orders table.
 type Order struct {
 	ID                int64     `json:"id"`
@@ -57,9 +63,23 @@ type OrderDetail struct {
 	CreatedAt       time.Time `json:"created_at"`
 }
 
-// GenerateOrderNumber creates a unique order number: RO + timestamp + 4 random hex chars.
+// GenerateOrderNumber creates a unique order number: RO + timestamp (microsecond) + 8 random hex chars.
+// Format: RO20260102150405123456ABCD1234 (prefix + YYYYMMDDHHmmssμs + random)
+// Microsecond precision + 4 random bytes = extremely low collision risk.
 func GenerateOrderNumber() string {
-	b := make([]byte, 2)
-	rand.Read(b)
-	return fmt.Sprintf("RO%s%X", time.Now().Format("20060102150405"), b)
+	b := make([]byte, 4)
+	if _, err := rand.Read(b); err != nil {
+		// Fallback: use nanosecond time as additional entropy
+		nanos := time.Now().UnixNano()
+		b[0] = byte(nanos >> 24)
+		b[1] = byte(nanos >> 16)
+		b[2] = byte(nanos >> 8)
+		b[3] = byte(nanos)
+	}
+	now := time.Now()
+	// Use microsecond precision to reduce same-second collisions
+	return fmt.Sprintf("RO%s%06d%X", 
+		now.Format("20060102150405"), 
+		now.Nanosecond()/1000, // microseconds
+		b)
 }

@@ -1,0 +1,11 @@
+{
+  "requestId": "TEST-PAY-20260818-0001",
+  "globalOrderNumber": "G202608180001",
+  "paymentNumber": "PAY-TEST-20260818-0001",
+  "payChannel": "STRIPE",
+  "globalOrderPayType": 100,
+  "payCurrency": "JPY",
+  "payAmount": 10500,
+  "payTime": "2026-08-18T13:35:00+08:00",
+  "operator": "SYSTEM_GLOBAL"
+}

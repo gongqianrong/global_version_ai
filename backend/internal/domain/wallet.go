@@ -73,11 +73,22 @@ type RechargeOrder struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
-// GenerateRechargeNo creates a unique recharge order number: RC + timestamp + 4 random hex chars.
+// GenerateRechargeNo creates a unique recharge order number: RC + timestamp (microsecond) + 8 random hex chars.
+// Format: RC20260102150405123456ABCD1234 (prefix + YYYYMMDDHHmmssμs + random)
 func GenerateRechargeNo() string {
-	b := make([]byte, 2)
-	rand.Read(b)
-	return fmt.Sprintf("RC%s%X", time.Now().Format("20060102150405"), b)
+	b := make([]byte, 4)
+	if _, err := rand.Read(b); err != nil {
+		nanos := time.Now().UnixNano()
+		b[0] = byte(nanos >> 24)
+		b[1] = byte(nanos >> 16)
+		b[2] = byte(nanos >> 8)
+		b[3] = byte(nanos)
+	}
+	now := time.Now()
+	return fmt.Sprintf("RC%s%06d%X", 
+		now.Format("20060102150405"), 
+		now.Nanosecond()/1000,
+		b)
 }
 
 // Wallet represents a user's JPY wallet.

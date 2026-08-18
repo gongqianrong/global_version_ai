@@ -199,6 +199,8 @@ func main() {
 		rechargeHandler       *api.RechargeHandler
 		waybillHandler        *api.WaybillHandler
 		orderHandler          *api.OrderHandler
+		orderLinkHandler      *api.OrderLinkHandler
+		globalOrderHandler    *api.GlobalOrderHandler
 		recommendationHandler *api.RecommendationHandler
 		adminChecker          api.UserAdminChecker
 	)
@@ -242,8 +244,16 @@ func main() {
 		orderSvc := service.NewOrderService(esFetcher, walletRepo, orderRepo, cartRepo)
 		orderHandler = api.NewOrderHandler(orderSvc, orderRepo)
 
+		// Global order sync (for international version)
+		globalOrderRepo := repo.NewGlobalOrderRepo(pgDB)
+		globalOrderSvc := service.NewGlobalOrderService(globalOrderRepo, orderRepo)
+		globalOrderHandler = api.NewGlobalOrderHandler(globalOrderSvc)
+
 		waybillRepo := repo.NewWaybillRepo(pgDB)
 		waybillHandler = api.NewWaybillHandler(waybillRepo, waybillRepo, walletRepo)
+
+		orderLinkRepo := repo.NewOrderLinkRepo(pgDB)
+		orderLinkHandler = api.NewOrderLinkHandler(orderLinkRepo, walletRepo, orderRepo)
 
 		rechargeRepo := repo.NewRechargeRepo(pgDB)
 		rechargeHandler = api.NewRechargeHandler(rechargeRepo, walletRepo, nil)
@@ -320,6 +330,8 @@ func main() {
 		RechargeHandler:       rechargeHandler,
 		WaybillHandler:        waybillHandler,
 		OrderHandler:          orderHandler,
+		OrderLinkHandler:      orderLinkHandler,
+		GlobalOrderHandler:    globalOrderHandler,
 		RecommendationHandler: recommendationHandler,
 		AdminChecker:          adminChecker,
 		JWTManager:            jwtManager,
