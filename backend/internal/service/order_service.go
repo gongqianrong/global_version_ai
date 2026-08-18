@@ -98,6 +98,7 @@ type OrderRepository interface {
 	UpdateState(ctx context.Context, orderNumber string, fromState, toState int) error
 	ListByUser(ctx context.Context, userID int64, state, limit, offset int) ([]domain.Order, int64, error)
 	GetDetailsByOrderIDs(ctx context.Context, orderIDs []int64) (map[int64][]domain.OrderDetail, error)
+	PayOrderAtomic(ctx context.Context, orderNumber string, userID int64, amount int64, walletRepo interface{}) (*domain.WalletTransaction, error)
 }
 
 // OrderDetailResponse is a single order detail item in API responses.
@@ -139,15 +140,22 @@ type CartRemover interface {
 
 // OrderService handles order settlement, confirmation, and payment logic.
 type OrderService struct {
-	products ProductFetcher
-	wallet   WalletService
-	orders   OrderRepository
-	cart     CartRemover
+	products   ProductFetcher
+	wallet     WalletService
+	walletRepo interface{} // Concrete repo for atomic transactions
+	orders     OrderRepository
+	cart       CartRemover
 }
 
 // NewOrderService creates an OrderService.
 func NewOrderService(pf ProductFetcher, ws WalletService, or OrderRepository, cr CartRemover) *OrderService {
-	return &OrderService{products: pf, wallet: ws, orders: or, cart: cr}
+	return &OrderService{
+		products:   pf,
+		wallet:     ws,
+		walletRepo: ws, // WalletService is also the concrete repo
+		orders:     or,
+		cart:       cr,
+	}
 }
 
 // Settlement computes an order preview without persisting anything.
@@ -294,19 +302,9 @@ func (s *OrderService) Pay(ctx context.Context, userID int64, orderNumber string
 	// CRITICAL FIX: Atomic payment using PayOrderAtomic
 	// This ensures wallet deduction and order state update happen in ONE transaction.
 	// If either fails, both are rolled back - no partial success.
-	type AtomicPaymentRepo interface {
-		PayOrderAtomic(ctx context.Context, orderNumber string, userID int64, amount int64, walletRepo interface {
-			AdjustWithTx(ctx context.Context, tx interface{}, userID int64, amount int64, txType, description string, relatedOrder *string) (*domain.WalletTransaction, error)
-		}) (*domain.WalletTransaction, error)
-	}
-
-	atomicRepo, ok := s.orders.(AtomicPaymentRepo)
-	if !ok {
-		// Fallback to old implementation (should not happen after migration)
-		return nil, fmt.Errorf("order_service: order repository does not support atomic payment")
-	}
-
-	wtx, err := atomicRepo.PayOrderAtomic(ctx, orderNumber, userID, order.OrderInpriceJp, s.wallet)
+	
+	// Direct call to PayOrderAtomic (OrderRepo implements this method)
+	wtx, err := s.orders.PayOrderAtomic(ctx, orderNumber, userID, order.OrderInpriceJp, s.walletRepo)
 	if err != nil {
 		return nil, fmt.Errorf("order_service: atomic payment failed: %w", err)
 	}

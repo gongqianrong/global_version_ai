@@ -234,9 +234,7 @@ func (r *OrderRepo) PayOrderAtomic(
 	orderNumber string,
 	userID int64,
 	amount int64,
-	walletRepo interface {
-		AdjustWithTx(ctx context.Context, tx pgx.Tx, userID int64, amount int64, txType, description string, relatedOrder *string) (*domain.WalletTransaction, error)
-	},
+	walletRepo *WalletRepo,
 ) (*domain.WalletTransaction, error) {
 	tx, err := r.db.Pool.Begin(ctx)
 	if err != nil {
