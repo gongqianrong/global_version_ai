@@ -43,8 +43,14 @@ func (h *GlobalOrderHandler) HandleSync(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Always return success with business result
-	// Caller MUST check resp.Success
+	// Check business result
+	if !resp.Success {
+		log.Printf("Order sync validation failed: %s", resp.Message)
+		ErrorWithCode(w, r, http.StatusBadRequest, 40002, resp.Message)
+		return
+	}
+
+	// Return success
 	Success(w, r, resp)
 }
 
@@ -65,7 +71,13 @@ func (h *GlobalOrderHandler) HandlePaymentSuccess(w http.ResponseWriter, r *http
 		return
 	}
 
-	// IMPORTANT: Always return Result.success() with business result
-	// Caller MUST check resp.Success to determine actual business outcome
+	// Check business result
+	if !resp.Success {
+		log.Printf("Payment sync validation failed: %s", resp.Message)
+		ErrorWithCode(w, r, http.StatusBadRequest, 40002, resp.Message)
+		return
+	}
+
+	// Return success
 	Success(w, r, resp)
 }
