@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"math/big"
 	"time"
 )
 
@@ -14,17 +13,17 @@ type GlobalOrderSyncRequest struct {
 	AccountAddressID    *string                     `json:"accountAddressId"`
 	OrderAddtime        *time.Time                  `json:"orderAddtime"`
 	PayEffectiveTime    time.Time                   `json:"payEffectiveTime"`
-	OrderTotalJp        *big.Float                  `json:"orderTotalJp"`
-	OrderTotalCn        *big.Float                  `json:"orderTotalCn"`
-	CommissionFeeJp     *big.Float                  `json:"commissionFeeJp"`
-	CommissionFeeCn     *big.Float                  `json:"commissionFeeCn"`
-	HandlingFeeJp       *big.Float                  `json:"handlingFeeJp"`
-	HandlingFeeCn       *big.Float                  `json:"handlingFeeCn"`
-	OrderInpriceJp      *big.Float                  `json:"orderInpriceJp"`
-	OrderInpriceCn      *big.Float                  `json:"orderInpriceCn"`
-	OrderRate           *big.Float                  `json:"orderRate"`
-	TotalShippingFee    *big.Float                  `json:"totalShippingFee"`
-	TotalShippingFeeCn  *big.Float                  `json:"totalShippingFeeCn"`
+	OrderTotalJp        float64                     `json:"orderTotalJp"`
+	OrderTotalCn        float64                     `json:"orderTotalCn"`
+	CommissionFeeJp     float64                     `json:"commissionFeeJp"`
+	CommissionFeeCn     float64                     `json:"commissionFeeCn"`
+	HandlingFeeJp       float64                     `json:"handlingFeeJp"`
+	HandlingFeeCn       float64                     `json:"handlingFeeCn"`
+	OrderInpriceJp      float64                     `json:"orderInpriceJp"`
+	OrderInpriceCn      float64                     `json:"orderInpriceCn"`
+	OrderRate           float64                     `json:"orderRate"`
+	TotalShippingFee    float64                     `json:"totalShippingFee"`
+	TotalShippingFeeCn  float64                     `json:"totalShippingFeeCn"`
 	OrderType           *int                        `json:"orderType"`
 	OrderPurchaseType   *int                        `json:"orderPurchaseType"`
 	OrderMode           *int                        `json:"orderMode"`
@@ -36,25 +35,25 @@ type GlobalOrderSyncRequest struct {
 
 // GlobalOrderDetailRequest represents a detail item in the sync request.
 type GlobalOrderDetailRequest struct {
-	GlobalOrderDetailNumber string     `json:"globalOrderDetailNumber"`
-	Platform                int        `json:"platform"`
-	GoodsMid                string     `json:"goodsMid"`
-	GoodsImg                *string    `json:"goodsImg"`
-	GoodsName               *string    `json:"goodsName"`
-	GoodsNum                *int       `json:"goodsNum"`
-	GoodsAmountJp           *big.Float `json:"goodsAmountJp"`
-	GoodsAmountCn           *big.Float `json:"goodsAmountCn"`
-	CommissionFeeJp         *big.Float `json:"commissionFeeJp"`
-	CommissionFeeCn         *big.Float `json:"commissionFeeCn"`
-	HandlingFeeJp           *big.Float `json:"handlingFeeJp"`
-	HandlingFeeCn           *big.Float `json:"handlingFeeCn"`
-	GoodsUrl                *string    `json:"goodsUrl"`
-	SellerID                *string    `json:"sellerId"`
-	ShippingFeeJp           *big.Float `json:"shippingFeeJp"`
-	ShippingFeeCn           *big.Float `json:"shippingFeeCn"`
-	OrderPurchaseType       *int       `json:"orderPurchaseType"`
-	PurchaseDirect          *int       `json:"purchaseDirect"`
-	DiscountType            *int       `json:"discountType"`
+	GlobalOrderDetailNumber string   `json:"globalOrderDetailNumber"`
+	Platform                int      `json:"platform"`
+	GoodsMid                string   `json:"goodsMid"`
+	GoodsImg                *string  `json:"goodsImg"`
+	GoodsName               *string  `json:"goodsName"`
+	GoodsNum                *int     `json:"goodsNum"`
+	GoodsAmountJp           float64  `json:"goodsAmountJp"`
+	GoodsAmountCn           float64  `json:"goodsAmountCn"`
+	CommissionFeeJp         float64  `json:"commissionFeeJp"`
+	CommissionFeeCn         float64  `json:"commissionFeeCn"`
+	HandlingFeeJp           float64  `json:"handlingFeeJp"`
+	HandlingFeeCn           float64  `json:"handlingFeeCn"`
+	GoodsUrl                *string  `json:"goodsUrl"`
+	SellerID                *string  `json:"sellerId"`
+	ShippingFeeJp           float64  `json:"shippingFeeJp"`
+	ShippingFeeCn           float64  `json:"shippingFeeCn"`
+	OrderPurchaseType       *int     `json:"orderPurchaseType"`
+	PurchaseDirect          *int     `json:"purchaseDirect"`
+	DiscountType            *int     `json:"discountType"`
 }
 
 // GlobalOrderSyncResponse represents the response of order sync.
@@ -70,15 +69,15 @@ type GlobalOrderSyncResponse struct {
 
 // GlobalPaymentSyncRequest represents the request to sync payment success.
 type GlobalPaymentSyncRequest struct {
-	RequestID          string     `json:"requestId"`
-	GlobalOrderNumber  string     `json:"globalOrderNumber"`
-	PaymentNumber      string     `json:"paymentNumber"`
-	PayChannel         string     `json:"payChannel"`
-	GlobalOrderPayType int        `json:"globalOrderPayType"`
-	PayCurrency        string     `json:"payCurrency"`
-	PayAmount          *big.Float `json:"payAmount"`
-	PayTime            time.Time  `json:"payTime"`
-	Operator           *string    `json:"operator"`
+	RequestID          string      `json:"requestId"`
+	GlobalOrderNumber  string      `json:"globalOrderNumber"`
+	PaymentNumber      string      `json:"paymentNumber"`
+	PayChannel         string      `json:"payChannel"`
+	PayWay             *int        `json:"payWay"`
+	PayAmountJp        float64     `json:"payAmountJp"`
+	PayAmountCn        float64     `json:"payAmountCn"`
+	PaySeccussTime     time.Time   `json:"paySeccussTime"`
+	Operator           *string     `json:"operator"`
 }
 
 // GlobalPaymentSyncResponse represents the response of payment sync.

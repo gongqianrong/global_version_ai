@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/rakutao/collection-gateway/internal/db"
@@ -21,15 +20,11 @@ func NewGlobalOrderRepo(d *db.DB) *GlobalOrderRepo {
 	return &GlobalOrderRepo{db: d}
 }
 
-// Helper function to convert big.Float to int64 cents (JPY)
-func bigFloatToInt64Cents(f *big.Float) int64 {
-	if f == nil {
-		return 0
-	}
+// Helper function to convert float64 to int64 cents (JPY)
+func float64ToInt64Cents(f float64) int64 {
 	// Multiply by 100 to convert to cents, then convert to int64
-	cents := new(big.Float).Mul(f, big.NewFloat(100))
-	result, _ := cents.Int64()
-	return result
+	cents := f * 100
+	return int64(cents)
 }
 
 // Helper function to get int value with default
@@ -72,10 +67,10 @@ func (r *GlobalOrderRepo) CreateGlobalOrder(
 		OrderNumber:       orderNumber,
 		UserID:            userID,
 		OrderState:        domain.OrderStateBEPAY, // BEPAY = waiting for payment
-		OrderTotalJp:      bigFloatToInt64Cents(req.OrderTotalJp),
-		CommissionFeeJp:   bigFloatToInt64Cents(req.CommissionFeeJp),
-		ShippingFeeJp:     bigFloatToInt64Cents(req.TotalShippingFee),
-		OrderInpriceJp:    bigFloatToInt64Cents(req.OrderInpriceJp),
+		OrderTotalJp:      float64ToInt64Cents(req.OrderTotalJp),
+		CommissionFeeJp:   float64ToInt64Cents(req.CommissionFeeJp),
+		ShippingFeeJp:     float64ToInt64Cents(req.TotalShippingFee),
+		OrderInpriceJp:    float64ToInt64Cents(req.OrderInpriceJp),
 		OrderPaytype:      req.GlobalOrderPayType,
 		OrderRemark:       stringOrDefault(req.OrderRemark, ""),
 		OrderPurchaseType: intOrDefault(req.OrderPurchaseType, domain.OrderPurchaseTypeNormal),
@@ -104,9 +99,9 @@ func (r *GlobalOrderRepo) CreateGlobalOrder(
 			GoodsNum:        intOrDefault(detailReq.GoodsNum, 1),
 			GoodsImg:        stringOrDefault(detailReq.GoodsImg, ""),
 			GoodsUrl:        stringOrDefault(detailReq.GoodsUrl, ""),
-			GoodsAmountJp:   bigFloatToInt64Cents(detailReq.GoodsAmountJp),
-			CommissionFeeJp: bigFloatToInt64Cents(detailReq.CommissionFeeJp),
-			ShippingFeeJp:   bigFloatToInt64Cents(detailReq.ShippingFeeJp),
+			GoodsAmountJp:   float64ToInt64Cents(detailReq.GoodsAmountJp),
+			CommissionFeeJp: float64ToInt64Cents(detailReq.CommissionFeeJp),
+			ShippingFeeJp:   float64ToInt64Cents(detailReq.ShippingFeeJp),
 			SellerID:        stringOrDefault(detailReq.SellerID, ""),
 			SellerName:      "", // Not provided in request
 			Platform:        fmt.Sprintf("%d", detailReq.Platform),
@@ -285,13 +280,13 @@ func (r *GlobalOrderRepo) UpdatePaymentSuccess(
 	}
 
 	// Insert payment record
-	payAmount := bigFloatToInt64Cents(paymentReq.PayAmount)
+	payAmount := float64ToInt64Cents(paymentReq.PayAmountJp)
 	_, err = tx.Exec(ctx,
 		`INSERT INTO global_order_payments 
 		 (order_id, payment_number, pay_channel, pay_currency, pay_amount, pay_time, operator)
 		 VALUES ($1,$2,$3,$4,$5,$6,$7)`,
 		record.OrderID, paymentReq.PaymentNumber, paymentReq.PayChannel,
-		paymentReq.PayCurrency, payAmount, paymentReq.PayTime, paymentReq.Operator,
+		"JPY", payAmount, paymentReq.PaySeccussTime, paymentReq.Operator,
 	)
 	if err != nil {
 		return fmt.Errorf("global_order_repo: insert payment: %w", err)

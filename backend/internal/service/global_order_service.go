@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math/big"
 
 	"github.com/rakutao/collection-gateway/internal/domain"
 )
@@ -123,16 +122,10 @@ func ValidatePaymentRequest(req *domain.GlobalPaymentSyncRequest) error {
 	if req.PayChannel == "" {
 		return ErrPayChannelEmpty
 	}
-	if req.GlobalOrderPayType == 0 {
-		return ErrGlobalOrderPayTypeEmpty
-	}
-	if req.PayCurrency == "" {
-		return ErrPayCurrencyEmpty
-	}
-	if req.PayAmount == nil || req.PayAmount.Cmp(big.NewFloat(0)) <= 0 {
+	if req.PayAmountJp <= 0 {
 		return ErrPayAmountInvalid
 	}
-	if req.PayTime.IsZero() {
+	if req.PaySeccussTime.IsZero() {
 		return ErrPayTimeEmpty
 	}
 
@@ -249,18 +242,6 @@ func (s *GlobalOrderService) SyncGlobalPayment(ctx context.Context, req *domain.
 		}, nil
 	}
 
-	// Check globalOrderPayType matches
-	if globalRecord.GlobalOrderPayType != req.GlobalOrderPayType {
-		s.globalRepo.MarkPaymentException(ctx, req.GlobalOrderNumber, "PayType mismatch")
-		return &domain.GlobalPaymentSyncResponse{
-			Success:           false,
-			Idempotent:        false,
-			Message:           ErrPayTypeMismatch.Error(),
-			GlobalOrderNumber: req.GlobalOrderNumber,
-			PaymentNumber:     req.PaymentNumber,
-		}, nil
-	}
-
 	// Check if already in exception state
 	if globalRecord.PaymentSyncState == domain.PaymentSyncStateException {
 		return &domain.GlobalPaymentSyncResponse{
@@ -305,26 +286,24 @@ func (s *GlobalOrderService) SyncGlobalPayment(ctx context.Context, req *domain.
 	}
 
 	// Check payment amount for JPY currency
-	if req.PayCurrency == "JPY" {
-		order, _, err := s.localRepo.GetByOrderNumber(ctx, globalRecord.OrderNumber)
-		if err != nil {
-			return nil, fmt.Errorf("获取订单失败: %w", err)
-		}
+	// Validate payment amount matches order amount (JPY)
+	order, _, err := s.localRepo.GetByOrderNumber(ctx, globalRecord.OrderNumber)
+	if err != nil {
+		return nil, fmt.Errorf("获取订单失败: %w", err)
+	}
 
-		// Convert payment amount to cents
-		payAmountCents := new(big.Float).Mul(req.PayAmount, big.NewFloat(100))
-		payAmountInt64, _ := payAmountCents.Int64()
+	// Convert payment amount to cents (JPY)
+	payAmountInt64 := int64(req.PayAmountJp * 100)
 
-		if payAmountInt64 != order.OrderInpriceJp {
-			s.globalRepo.MarkPaymentException(ctx, req.GlobalOrderNumber, "Amount mismatch")
-			return &domain.GlobalPaymentSyncResponse{
-				Success:           false,
-				Idempotent:        false,
-				Message:           fmt.Sprintf("%s: 期望 %d, 实际 %d", ErrAmountMismatch.Error(), order.OrderInpriceJp, payAmountInt64),
-				GlobalOrderNumber: req.GlobalOrderNumber,
-				PaymentNumber:     req.PaymentNumber,
-			}, nil
-		}
+	if payAmountInt64 != order.OrderInpriceJp {
+		s.globalRepo.MarkPaymentException(ctx, req.GlobalOrderNumber, "Amount mismatch")
+		return &domain.GlobalPaymentSyncResponse{
+			Success:           false,
+			Idempotent:        false,
+			Message:           fmt.Sprintf("%s: 期望 %d, 实际 %d", ErrAmountMismatch.Error(), order.OrderInpriceJp, payAmountInt64),
+			GlobalOrderNumber: req.GlobalOrderNumber,
+			PaymentNumber:     req.PaymentNumber,
+		}, nil
 	}
 
 	// Update payment success
@@ -344,7 +323,7 @@ func (s *GlobalOrderService) SyncGlobalPayment(ctx context.Context, req *domain.
 	}
 
 	// Get updated order
-	order, _, err := s.localRepo.GetByOrderNumber(ctx, globalRecord.OrderNumber)
+	order, _, err = s.localRepo.GetByOrderNumber(ctx, globalRecord.OrderNumber)
 	if err != nil {
 		return nil, fmt.Errorf("获取订单失败: %w", err)
 	}
