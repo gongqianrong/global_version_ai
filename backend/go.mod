@@ -1,6 +1,6 @@
 module github.com/rakutao/collection-gateway
 
-go 1.24
+go 1.24.0
 
 require (
 	github.com/elastic/go-elasticsearch/v8 v8.19.3
