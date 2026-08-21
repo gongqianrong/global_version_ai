@@ -17,6 +17,7 @@ import (
 	"github.com/rakutao/collection-gateway/internal/auth"
 	"github.com/rakutao/collection-gateway/internal/brand"
 	"github.com/rakutao/collection-gateway/internal/cache"
+	"github.com/rakutao/collection-gateway/internal/client"
 	"github.com/rakutao/collection-gateway/internal/db"
 	"github.com/rakutao/collection-gateway/internal/email"
 	"github.com/rakutao/collection-gateway/internal/domain"
@@ -242,6 +243,15 @@ func main() {
 
 		orderRepo := repo.NewOrderRepo(pgDB)
 		orderSvc := service.NewOrderService(esFetcher, walletRepo, orderRepo, cartRepo)
+		
+		// Admin sync client (optional, for international version)
+		adminSyncURL := os.Getenv("ADMIN_SYNC_URL")
+		if adminSyncURL != "" {
+			adminSyncClient := client.NewAdminSyncClient(adminSyncURL)
+			orderSvc.SetAdminSync(adminSyncClient)
+			log.Printf("  Admin Sync:        enabled (%s)", adminSyncURL)
+		}
+		
 		orderHandler = api.NewOrderHandler(orderSvc, orderRepo)
 
 		// Global order sync (for international version)

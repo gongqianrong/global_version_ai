@@ -137,6 +137,12 @@ type CartRemover interface {
 	Remove(ctx context.Context, userID int64, productID string) error
 }
 
+// AdminSyncClient handles syncing to admin backend.
+type AdminSyncClient interface {
+	SyncOrderAsync(ctx context.Context, order *domain.Order, details []domain.OrderDetail, userID string)
+	SyncPaymentAsync(ctx context.Context, orderNumber string, paymentAmount int64, userID string)
+}
+
 // OrderService handles order settlement, confirmation, and payment logic.
 type OrderService struct {
 	products    ProductFetcher
@@ -145,6 +151,7 @@ type OrderService struct {
 	orderRepo   interface{} // Concrete *OrderRepo for PayOrderAtomic
 	walletRepo  interface{} // Concrete *WalletRepo for atomic transactions  
 	cart        CartRemover
+	adminSync   AdminSyncClient // Optional: sync to admin backend
 }
 
 // NewOrderService creates an OrderService.
@@ -156,7 +163,13 @@ func NewOrderService(pf ProductFetcher, ws WalletService, or OrderRepository, cr
 		orderRepo:   or,  // Same instance, used for concrete methods
 		walletRepo:  ws,  // Same instance, used for atomic transactions
 		cart:        cr,
+		adminSync:   nil, // Set via SetAdminSync if needed
 	}
+}
+
+// SetAdminSync sets the admin sync client (optional).
+func (s *OrderService) SetAdminSync(client AdminSyncClient) {
+	s.adminSync = client
 }
 
 // Settlement computes an order preview without persisting anything.
@@ -257,6 +270,12 @@ func (s *OrderService) Confirm(ctx context.Context, userID int64, items []OrderI
 		return nil, fmt.Errorf("order_service: create order: %w", err)
 	}
 
+	// Sync to admin backend (async, best effort)
+	if s.adminSync != nil {
+		userIDStr := fmt.Sprintf("%d", userID)
+		go s.adminSync.SyncOrderAsync(context.Background(), order, orderDetails, userIDStr)
+	}
+
 	// Remove items from cart (best effort).
 	for _, item := range items {
 		if removeErr := s.cart.Remove(ctx, userID, item.ProductID); removeErr != nil {
@@ -317,6 +336,12 @@ func (s *OrderService) Pay(ctx context.Context, userID int64, orderNumber string
 	wtx, err := orderRepo.PayOrderAtomic(ctx, orderNumber, userID, order.OrderInpriceJp, s.walletRepo)
 	if err != nil {
 		return nil, fmt.Errorf("order_service: atomic payment failed: %w", err)
+	}
+
+	// Sync payment success to admin backend (async, best effort)
+	if s.adminSync != nil {
+		userIDStr := fmt.Sprintf("%d", userID)
+		go s.adminSync.SyncPaymentAsync(context.Background(), orderNumber, order.OrderInpriceJp, userIDStr)
 	}
 
 	return &PayResult{

@@ -22,6 +22,7 @@ services:
       - YAHOO_AUCTION_API_URL=http://yahoo-proxy:3001
       - REDIS_URL=redis://redis:6379
       - MALL_TRANSLATE_URL=http://cloud.gamestudio.tech/mall-translate
+      - ADMIN_SYNC_URL=http://cloud.gamestudio.tech/mall-order
       - DATABASE_URL=postgres://rakutao:rakutao@postgres:5432/rakutao?sslmode=disable
       - JWT_SECRET=change-me-to-a-random-secret-in-production
       - SMTP_HOST=mail.rakutao.vip
