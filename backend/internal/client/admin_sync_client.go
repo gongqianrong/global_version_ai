@@ -227,9 +227,9 @@ func ConvertOrderToSyncRequest(order *domain.Order, details []domain.OrderDetail
 			HandlingFeeJp:           0,
 			HandlingFeeCn:           0,
 			GoodsUrl:                d.GoodsUrl,
-			SellerID:                d.GoodsSellerId,
-			ShippingFeeJp:           float64(d.ShippingFee) / 100.0,
-			ShippingFeeCn:           float64(d.ShippingFee) / 100.0 * 0.05,
+			SellerID:                d.SellerID,
+			ShippingFeeJp:           float64(d.ShippingFeeJp) / 100.0,
+			ShippingFeeCn:           float64(d.ShippingFeeJp) / 100.0 * 0.05,
 			OrderPurchaseType:       order.OrderPurchaseType,
 		}
 	}
@@ -253,7 +253,7 @@ func ConvertOrderToSyncRequest(order *domain.Order, details []domain.OrderDetail
 		OrderRate:          0.05,
 		TotalShippingFee:   float64(order.ShippingFeeJp) / 100.0,
 		TotalShippingFeeCn: float64(order.ShippingFeeJp) / 100.0 * 0.05,
-		OrderType:          order.OrderType,
+		OrderType:          1, // Default order type
 		OrderPurchaseType:  order.OrderPurchaseType,
 		OrderMode:          1, // Auto order
 		OrderRemark:        order.OrderRemark,

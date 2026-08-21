@@ -58,17 +58,11 @@ func (r *GlobalOrderRepo) CreateGlobalOrder(
 	// Generate local order number
 	orderNumber := domain.GenerateOrderNumber()
 
-	// Get user ID from test@test.com for testing
-	// TODO: In production, implement proper accountInfoId to user_id mapping
+	// Parse user ID from accountInfoId
 	var userID int64
-	err := tx.QueryRow(ctx, 
-		`SELECT id FROM users WHERE email = 'test@test.com' LIMIT 1`).Scan(&userID)
-	if err != nil {
-		// Fallback: try to parse accountInfoId as userID
-		fmt.Sscanf(req.AccountInfoID, "%d", &userID)
-		if userID == 0 {
-			return nil, nil, nil, fmt.Errorf("global_order_repo: user not found for email test@test.com and invalid accountInfoId")
-		}
+	fmt.Sscanf(req.AccountInfoID, "%d", &userID)
+	if userID == 0 {
+		return nil, nil, nil, fmt.Errorf("global_order_repo: invalid accountInfoID: %s", req.AccountInfoID)
 	}
 
 	// Create main order
