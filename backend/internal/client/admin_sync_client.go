@@ -17,10 +17,10 @@ type JavaCompatibleTime struct {
 	time.Time
 }
 
-// MarshalJSON formats time in Java-compatible ISO 8601 with milliseconds.
+// MarshalJSON formats time in Java-compatible format: yyyy-MM-dd HH:mm:ss (UTC+8).
 func (t JavaCompatibleTime) MarshalJSON() ([]byte, error) {
-	// Format: 2006-01-02T15:04:05.000+08:00 (milliseconds, not nanoseconds)
-	formatted := t.Time.Format("2006-01-02T15:04:05.000-07:00")
+	// Format: 2026-08-21 15:14:38 (no timezone info, assumes UTC+8)
+	formatted := t.Time.Format("2006-01-02 15:04:05")
 	return json.Marshal(formatted)
 }
 
