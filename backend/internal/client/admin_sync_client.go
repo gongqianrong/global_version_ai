@@ -12,6 +12,18 @@ import (
 	"github.com/rakutao/collection-gateway/internal/domain"
 )
 
+// JavaCompatibleTime wraps time.Time to marshal in Java-compatible format.
+type JavaCompatibleTime struct {
+	time.Time
+}
+
+// MarshalJSON formats time in Java-compatible ISO 8601 with milliseconds.
+func (t JavaCompatibleTime) MarshalJSON() ([]byte, error) {
+	// Format: 2006-01-02T15:04:05.000+08:00 (milliseconds, not nanoseconds)
+	formatted := t.Time.Format("2006-01-02T15:04:05.000-07:00")
+	return json.Marshal(formatted)
+}
+
 // AdminSyncClient handles synchronization with the admin backend.
 type AdminSyncClient struct {
 	baseURL    string
@@ -44,8 +56,8 @@ type SyncOrderRequest struct {
 	GlobalAccountID      string                   `json:"globalAccountId,omitempty"`
 	AccountInfoID        string                   `json:"accountInfoId"`
 	AccountAddressID     string                   `json:"accountAddressId,omitempty"`
-	OrderAddtime         *time.Time               `json:"orderAddtime,omitempty"`
-	PayEffectiveTime     time.Time                `json:"payEffectiveTime"`
+	OrderAddtime         *JavaCompatibleTime      `json:"orderAddtime,omitempty"`
+	PayEffectiveTime     JavaCompatibleTime       `json:"payEffectiveTime"`
 	OrderTotalJp         float64                  `json:"orderTotalJp"`
 	OrderTotalCn         float64                  `json:"orderTotalCn"`
 	CommissionFeeJp      float64                  `json:"commissionFeeJp"`
@@ -91,15 +103,15 @@ type SyncOrderDetailRequest struct {
 
 // PaymentSyncRequest matches the admin API's payment sync request.
 type PaymentSyncRequest struct {
-	RequestID          string    `json:"requestId"`
-	GlobalOrderNumber  string    `json:"globalOrderNumber"`
-	PaymentNumber      string    `json:"paymentNumber"`
-	PayChannel         string    `json:"payChannel"`
-	GlobalOrderPayType int       `json:"globalOrderPayType"`
-	PayCurrency        string    `json:"payCurrency"`
-	PayAmount          float64   `json:"payAmount"`
-	PayTime            time.Time `json:"payTime"`
-	Operator           string    `json:"operator,omitempty"`
+	RequestID          string             `json:"requestId"`
+	GlobalOrderNumber  string             `json:"globalOrderNumber"`
+	PaymentNumber      string             `json:"paymentNumber"`
+	PayChannel         string             `json:"payChannel"`
+	GlobalOrderPayType int                `json:"globalOrderPayType"`
+	PayCurrency        string             `json:"payCurrency"`
+	PayAmount          float64            `json:"payAmount"`
+	PayTime            JavaCompatibleTime `json:"payTime"`
+	Operator           string             `json:"operator,omitempty"`
 }
 
 // SyncOrderResponse is the admin API's order sync response.
@@ -235,7 +247,7 @@ func ConvertOrderToSyncRequest(order *domain.Order, details []domain.OrderDetail
 	}
 
 	// Calculate payment effective time (30 minutes from now)
-	payEffectiveTime := time.Now().Add(30 * time.Minute)
+	payEffectiveTime := JavaCompatibleTime{Time: time.Now().Add(30 * time.Minute)}
 
 	return &SyncOrderRequest{
 		RequestID:          requestID,
@@ -295,7 +307,7 @@ func (c *AdminSyncClient) SyncPaymentAsync(ctx context.Context, orderNumber stri
 		GlobalOrderPayType: 100, // TODO: Get from order
 		PayCurrency:        "JPY",
 		PayAmount:          float64(paymentAmount) / 100.0,
-		PayTime:            time.Now(),
+		PayTime:            JavaCompatibleTime{Time: time.Now()},
 		Operator:           "SYSTEM_INTL",
 	}
 
