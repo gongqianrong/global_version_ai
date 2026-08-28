@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/rakutao/collection-gateway/internal/db"
@@ -55,14 +56,24 @@ func (r *GlobalOrderRepo) CreateGlobalOrder(
 	}
 	defer tx.Rollback(ctx)
 
+	// Map globalAccountId to local accountInfoId (user_id)
+	// TODO: This should call mall-userms service to map/create user
+	// For now, use a simple hash mapping or direct conversion
+	var userID int64
+	// Try to find existing mapping or create new one
+	// Simplified: hash globalAccountId to generate userID or query from mapping table
+	// For MVP, we'll use a simple approach
+	userID = hashGlobalAccountID(req.GlobalAccountID)
+
 	// Generate local order number
 	orderNumber := domain.GenerateOrderNumber()
 
-	// Parse user ID from accountInfoId
-	var userID int64
-	fmt.Sscanf(req.AccountInfoID, "%d", &userID)
-	if userID == 0 {
-		return nil, nil, nil, fmt.Errorf("global_order_repo: invalid accountInfoID: %s", req.AccountInfoID)
+	// Parse order add time
+	var orderAddtime time.Time
+	if req.OrderAddtime != nil && !req.OrderAddtime.IsZero() {
+		orderAddtime = req.OrderAddtime.Time
+	} else {
+		orderAddtime = time.Now()
 	}
 
 	// Create main order
@@ -81,16 +92,17 @@ func (r *GlobalOrderRepo) CreateGlobalOrder(
 
 	err = tx.QueryRow(ctx,
 		`INSERT INTO orders (order_number, user_id, order_state, order_total_jp, commission_fee_jp,
-		  shipping_fee_jp, order_inprice_jp, order_paytype, order_remark, order_purchase_type)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-		 RETURNING id, created_at, updated_at`,
+		  shipping_fee_jp, order_inprice_jp, order_paytype, order_remark, order_purchase_type, created_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+		 RETURNING id, updated_at`,
 		order.OrderNumber, order.UserID, order.OrderState, order.OrderTotalJp,
 		order.CommissionFeeJp, order.ShippingFeeJp, order.OrderInpriceJp,
-		order.OrderPaytype, order.OrderRemark, order.OrderPurchaseType,
-	).Scan(&order.ID, &order.CreatedAt, &order.UpdatedAt)
+		order.OrderPaytype, order.OrderRemark, order.OrderPurchaseType, orderAddtime,
+	).Scan(&order.ID, &order.UpdatedAt)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("global_order_repo: insert order: %w", err)
 	}
+	order.CreatedAt = orderAddtime
 
 	// Create order details
 	var details []domain.OrderDetail
@@ -98,10 +110,10 @@ func (r *GlobalOrderRepo) CreateGlobalOrder(
 		detail := domain.OrderDetail{
 			OrderID:         order.ID,
 			GoodsMid:        detailReq.GoodsMid,
-			GoodsName:       stringOrDefault(detailReq.GoodsName, ""),
+			GoodsName:       detailReq.GoodsName,
 			GoodsNum:        intOrDefault(detailReq.GoodsNum, 1),
 			GoodsImg:        stringOrDefault(detailReq.GoodsImg, ""),
-			GoodsUrl:        stringOrDefault(detailReq.GoodsUrl, ""),
+			GoodsUrl:        detailReq.GoodsUrl,
 			GoodsAmountJp:   float64ToInt64Cents(detailReq.GoodsAmountJp),
 			CommissionFeeJp: float64ToInt64Cents(detailReq.CommissionFeeJp),
 			ShippingFeeJp:   float64ToInt64Cents(detailReq.ShippingFeeJp),
@@ -160,6 +172,18 @@ func (r *GlobalOrderRepo) CreateGlobalOrder(
 	}
 
 	return order, globalRecord, details, nil
+}
+
+// hashGlobalAccountID generates a local user ID from global account ID
+// TODO: Replace with actual user mapping service call
+func hashGlobalAccountID(globalAccountID string) int64 {
+	// Simple hash for MVP - should be replaced with proper user service mapping
+	var hash uint64
+	for i := 0; i < len(globalAccountID); i++ {
+		hash = hash*31 + uint64(globalAccountID[i])
+	}
+	// Ensure positive int64
+	return int64(hash % 1000000000)
 }
 
 // GetByRequestID retrieves global order record by request ID.
@@ -282,14 +306,16 @@ func (r *GlobalOrderRepo) UpdatePaymentSuccess(
 		return fmt.Errorf("global_order_repo: order not in BEPAY state")
 	}
 
+	// Convert payment amount to cents
+	payAmount := float64ToInt64Cents(paymentReq.PayAmount)
+	
 	// Insert payment record
-	payAmount := float64ToInt64Cents(paymentReq.PayAmountJp)
 	_, err = tx.Exec(ctx,
 		`INSERT INTO global_order_payments 
 		 (order_id, payment_number, pay_channel, pay_currency, pay_amount, pay_time, operator)
 		 VALUES ($1,$2,$3,$4,$5,$6,$7)`,
 		record.OrderID, paymentReq.PaymentNumber, paymentReq.PayChannel,
-		"JPY", payAmount, paymentReq.PaySeccussTime, paymentReq.Operator,
+		paymentReq.PayCurrency, payAmount, paymentReq.PayTime.Time, paymentReq.Operator,
 	)
 	if err != nil {
 		return fmt.Errorf("global_order_repo: insert payment: %w", err)

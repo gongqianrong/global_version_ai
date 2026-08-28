@@ -13,12 +13,15 @@ var (
 	ErrSyncParamsEmpty          = errors.New("同步参数不能为空")
 	ErrRequestIDEmpty           = errors.New("requestId不能为空")
 	ErrGlobalOrderNumberEmpty   = errors.New("globalOrderNumber不能为空")
-	ErrAccountInfoIDEmpty       = errors.New("accountInfoId不能为空")
+	ErrGlobalAccountIDEmpty     = errors.New("globalAccountId不能为空")
 	ErrGlobalOrderPayTypeEmpty  = errors.New("globalOrderPayType不能为空")
 	ErrDetailListEmpty          = errors.New("订单明细不能为空")
 	ErrPayEffectiveTimeEmpty    = errors.New("payEffectiveTime不能为空")
 	ErrDetailNumberEmpty        = errors.New("globalOrderDetailNumber不能为空")
 	ErrGoodsMidEmpty            = errors.New("goodsMid不能为空")
+	ErrGoodsNameEmpty           = errors.New("goodsName不能为空")
+	ErrGoodsUrlEmpty            = errors.New("goodsUrl不能为空")
+	ErrDiscountTypeEmpty        = errors.New("discountType不能为空")
 	ErrPlatformEmpty            = errors.New("platform不能为空")
 	ErrPaymentNumberEmpty       = errors.New("paymentNumber不能为空")
 	ErrPayChannelEmpty          = errors.New("payChannel不能为空")
@@ -76,8 +79,8 @@ func ValidateSyncRequest(req *domain.GlobalOrderSyncRequest) error {
 	if req.GlobalOrderNumber == "" {
 		return ErrGlobalOrderNumberEmpty
 	}
-	if req.AccountInfoID == "" {
-		return ErrAccountInfoIDEmpty
+	if req.GlobalAccountID == "" {
+		return ErrGlobalAccountIDEmpty
 	}
 	if req.GlobalOrderPayType == 0 {
 		return ErrGlobalOrderPayTypeEmpty
@@ -97,9 +100,16 @@ func ValidateSyncRequest(req *domain.GlobalOrderSyncRequest) error {
 		if detail.GoodsMid == "" {
 			return fmt.Errorf("明细[%d]: %w", i, ErrGoodsMidEmpty)
 		}
+		if detail.GoodsName == "" {
+			return fmt.Errorf("明细[%d]: %w", i, ErrGoodsNameEmpty)
+		}
+		if detail.GoodsUrl == "" {
+			return fmt.Errorf("明细[%d]: %w", i, ErrGoodsUrlEmpty)
+		}
 		if detail.Platform == 0 {
 			return fmt.Errorf("明细[%d]: %w", i, ErrPlatformEmpty)
 		}
+		// discountType 字段已经是 int 类型，不会为 nil，无需额外校验
 	}
 
 	return nil
@@ -122,10 +132,16 @@ func ValidatePaymentRequest(req *domain.GlobalPaymentSyncRequest) error {
 	if req.PayChannel == "" {
 		return ErrPayChannelEmpty
 	}
-	if req.PayAmountJp <= 0 {
+	if req.GlobalOrderPayType == 0 {
+		return ErrGlobalOrderPayTypeEmpty
+	}
+	if req.PayCurrency == "" {
+		return ErrPayCurrencyEmpty
+	}
+	if req.PayAmount <= 0 {
 		return ErrPayAmountInvalid
 	}
-	if req.PaySeccussTime.IsZero() {
+	if req.PayTime.IsZero() {
 		return ErrPayTimeEmpty
 	}
 
@@ -242,6 +258,18 @@ func (s *GlobalOrderService) SyncGlobalPayment(ctx context.Context, req *domain.
 		}, nil
 	}
 
+	// Check globalOrderPayType consistency
+	if globalRecord.GlobalOrderPayType != req.GlobalOrderPayType {
+		s.globalRepo.MarkPaymentException(ctx, req.GlobalOrderNumber, "GlobalOrderPayType mismatch")
+		return &domain.GlobalPaymentSyncResponse{
+			Success:           false,
+			Idempotent:        false,
+			Message:           fmt.Sprintf("%s: 订单为 %d, 支付为 %d", ErrPayTypeMismatch.Error(), globalRecord.GlobalOrderPayType, req.GlobalOrderPayType),
+			GlobalOrderNumber: req.GlobalOrderNumber,
+			PaymentNumber:     req.PaymentNumber,
+		}, nil
+	}
+
 	// Check if already in exception state
 	if globalRecord.PaymentSyncState == domain.PaymentSyncStateException {
 		return &domain.GlobalPaymentSyncResponse{
@@ -285,26 +313,29 @@ func (s *GlobalOrderService) SyncGlobalPayment(ctx context.Context, req *domain.
 		}
 	}
 
-	// Check payment amount for JPY currency
-	// Validate payment amount matches order amount (JPY)
+	// Get order to validate payment amount
 	order, _, err := s.localRepo.GetByOrderNumber(ctx, globalRecord.OrderNumber)
 	if err != nil {
 		return nil, fmt.Errorf("获取订单失败: %w", err)
 	}
 
-	// Convert payment amount to cents (JPY)
-	payAmountInt64 := int64(req.PayAmountJp * 100)
+	// Validate payment amount for JPY currency
+	if req.PayCurrency == "JPY" {
+		// Convert payment amount to cents (JPY)
+		payAmountInt64 := int64(req.PayAmount * 100)
 
-	if payAmountInt64 != order.OrderInpriceJp {
-		s.globalRepo.MarkPaymentException(ctx, req.GlobalOrderNumber, "Amount mismatch")
-		return &domain.GlobalPaymentSyncResponse{
-			Success:           false,
-			Idempotent:        false,
-			Message:           fmt.Sprintf("%s: 期望 %d, 实际 %d", ErrAmountMismatch.Error(), order.OrderInpriceJp, payAmountInt64),
-			GlobalOrderNumber: req.GlobalOrderNumber,
-			PaymentNumber:     req.PaymentNumber,
-		}, nil
+		if payAmountInt64 != order.OrderInpriceJp {
+			s.globalRepo.MarkPaymentException(ctx, req.GlobalOrderNumber, "JPY amount mismatch")
+			return &domain.GlobalPaymentSyncResponse{
+				Success:           false,
+				Idempotent:        false,
+				Message:           fmt.Sprintf("%s: 订单金额 %.2f JPY, 支付金额 %.2f JPY", ErrAmountMismatch.Error(), float64(order.OrderInpriceJp)/100, req.PayAmount),
+				GlobalOrderNumber: req.GlobalOrderNumber,
+				PaymentNumber:     req.PaymentNumber,
+			}, nil
+		}
 	}
+	// For non-JPY currencies, save actual currency and amount for reconciliation
 
 	// Update payment success
 	err = s.globalRepo.UpdatePaymentSuccess(ctx, req.GlobalOrderNumber, req)
