@@ -242,7 +242,7 @@ func main() {
 		adminChecker = walletRepo
 
 		orderRepo := repo.NewOrderRepo(pgDB)
-		orderSvc := service.NewOrderService(esFetcher, walletRepo, orderRepo, cartRepo)
+		orderSvc := service.NewOrderService(esFetcher, walletRepo, orderRepo, userRepo, cartRepo) // 传入userRepo
 		
 		// Admin sync client (optional, for international version)
 		adminSyncURL := os.Getenv("ADMIN_SYNC_URL")

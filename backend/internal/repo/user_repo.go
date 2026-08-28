@@ -28,13 +28,16 @@ func NewUserRepo(d *db.DB) *UserRepo {
 
 // Create inserts a new user and returns the populated User (with ID and timestamps).
 func (r *UserRepo) Create(ctx context.Context, email, nickname, passwordHash string) (*domain.User, error) {
+	// 生成globalAccountID（使用email的哈希或UUID）
+	globalAccountID := fmt.Sprintf("INTL_%d", hashString(email))
+	
 	var u domain.User
 	err := r.db.Pool.QueryRow(ctx,
-		`INSERT INTO users (email, nickname, password_hash)
-		 VALUES ($1, $2, $3)
-		 RETURNING id, email, nickname, password_hash, created_at, updated_at`,
-		email, nickname, passwordHash,
-	).Scan(&u.ID, &u.Email, &u.Nickname, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt)
+		`INSERT INTO users (email, nickname, password_hash, global_account_id)
+		 VALUES ($1, $2, $3, $4)
+		 RETURNING id, email, nickname, password_hash, global_account_id, created_at, updated_at`,
+		email, nickname, passwordHash, globalAccountID,
+	).Scan(&u.ID, &u.Email, &u.Nickname, &u.PasswordHash, &u.GlobalAccountID, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if isDuplicateKey(err) {
 			return nil, ErrEmailExists
@@ -44,14 +47,23 @@ func (r *UserRepo) Create(ctx context.Context, email, nickname, passwordHash str
 	return &u, nil
 }
 
+// hashString generates a simple hash from string
+func hashString(s string) uint64 {
+	var hash uint64
+	for i := 0; i < len(s); i++ {
+		hash = hash*31 + uint64(s[i])
+	}
+	return hash % 1000000000
+}
+
 // GetByEmail fetches a user by email address.
 func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
 	var u domain.User
 	err := r.db.Pool.QueryRow(ctx,
-		`SELECT id, email, nickname, password_hash, created_at, updated_at
+		`SELECT id, email, nickname, password_hash, global_account_id, created_at, updated_at
 		 FROM users WHERE email = $1`,
 		email,
-	).Scan(&u.ID, &u.Email, &u.Nickname, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Email, &u.Nickname, &u.PasswordHash, &u.GlobalAccountID, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrUserNotFound
@@ -65,10 +77,10 @@ func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, 
 func (r *UserRepo) GetByID(ctx context.Context, id int64) (*domain.User, error) {
 	var u domain.User
 	err := r.db.Pool.QueryRow(ctx,
-		`SELECT id, email, nickname, password_hash, created_at, updated_at
+		`SELECT id, email, nickname, password_hash, global_account_id, created_at, updated_at
 		 FROM users WHERE id = $1`,
 		id,
-	).Scan(&u.ID, &u.Email, &u.Nickname, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Email, &u.Nickname, &u.PasswordHash, &u.GlobalAccountID, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrUserNotFound

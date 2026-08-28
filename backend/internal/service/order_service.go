@@ -100,6 +100,11 @@ type OrderRepository interface {
 	GetDetailsByOrderIDs(ctx context.Context, orderIDs []int64) (map[int64][]domain.OrderDetail, error)
 }
 
+// UserRepository provides user information.
+type UserRepository interface {
+	GetByID(ctx context.Context, userID int64) (*domain.User, error)
+}
+
 // OrderDetailResponse is a single order detail item in API responses.
 type OrderDetailResponse struct {
 	GoodsMid      string `json:"goodsMid"`
@@ -139,8 +144,8 @@ type CartRemover interface {
 
 // AdminSyncClient handles syncing to admin backend.
 type AdminSyncClient interface {
-	SyncOrderAsync(ctx context.Context, order *domain.Order, details []domain.OrderDetail, userID string)
-	SyncPaymentAsync(ctx context.Context, orderNumber string, paymentAmount int64, userID string)
+	SyncOrderAsync(ctx context.Context, order *domain.Order, details []domain.OrderDetail, globalAccountId string)
+	SyncPaymentAsync(ctx context.Context, orderNumber string, paymentAmount int64, globalAccountId string)
 }
 
 // OrderService handles order settlement, confirmation, and payment logic.
@@ -148,18 +153,20 @@ type OrderService struct {
 	products    ProductFetcher
 	wallet      WalletService
 	orders      OrderRepository
-	orderRepo   interface{} // Concrete *OrderRepo for PayOrderAtomic
-	walletRepo  interface{} // Concrete *WalletRepo for atomic transactions  
+	users       UserRepository  // 获取用户信息（包括globalAccountId）
+	orderRepo   interface{}     // Concrete *OrderRepo for PayOrderAtomic
+	walletRepo  interface{}     // Concrete *WalletRepo for atomic transactions  
 	cart        CartRemover
 	adminSync   AdminSyncClient // Optional: sync to admin backend
 }
 
 // NewOrderService creates an OrderService.
-func NewOrderService(pf ProductFetcher, ws WalletService, or OrderRepository, cr CartRemover) *OrderService {
+func NewOrderService(pf ProductFetcher, ws WalletService, or OrderRepository, ur UserRepository, cr CartRemover) *OrderService {
 	return &OrderService{
 		products:    pf,
 		wallet:      ws,
 		orders:      or,
+		users:       ur,
 		orderRepo:   or,  // Same instance, used for concrete methods
 		walletRepo:  ws,  // Same instance, used for atomic transactions
 		cart:        cr,
@@ -272,8 +279,15 @@ func (s *OrderService) Confirm(ctx context.Context, userID int64, items []OrderI
 
 	// Sync to admin backend (async, best effort)
 	if s.adminSync != nil {
-		userIDStr := fmt.Sprintf("%d", userID)
-		go s.adminSync.SyncOrderAsync(context.Background(), order, orderDetails, userIDStr)
+		// 获取用户的globalAccountId
+		user, err := s.users.GetByID(ctx, userID)
+		if err != nil {
+			log.Printf("[order] failed to get user for sync: %v", err)
+		} else if user.GlobalAccountID == "" {
+			log.Printf("[order] CRITICAL: user %d has empty GlobalAccountID, skip admin sync", userID)
+		} else {
+			go s.adminSync.SyncOrderAsync(context.Background(), order, orderDetails, user.GlobalAccountID)
+		}
 	}
 
 	// Remove items from cart (best effort).
@@ -340,8 +354,15 @@ func (s *OrderService) Pay(ctx context.Context, userID int64, orderNumber string
 
 	// Sync payment success to admin backend (async, best effort)
 	if s.adminSync != nil {
-		userIDStr := fmt.Sprintf("%d", userID)
-		go s.adminSync.SyncPaymentAsync(context.Background(), orderNumber, order.OrderInpriceJp, userIDStr)
+		// 获取用户的globalAccountId
+		user, err := s.users.GetByID(ctx, userID)
+		if err != nil {
+			log.Printf("[order] failed to get user for payment sync: %v", err)
+		} else if user.GlobalAccountID == "" {
+			log.Printf("[order] CRITICAL: user %d has empty GlobalAccountID, skip payment sync", userID)
+		} else {
+			go s.adminSync.SyncPaymentAsync(context.Background(), orderNumber, order.OrderInpriceJp, user.GlobalAccountID)
+		}
 	}
 
 	return &PayResult{

@@ -53,8 +53,7 @@ func NewAdminSyncClient(baseURL string) *AdminSyncClient {
 type SyncOrderRequest struct {
 	RequestID            string                   `json:"requestId"`
 	GlobalOrderNumber    string                   `json:"globalOrderNumber"`
-	GlobalAccountID      string                   `json:"globalAccountId,omitempty"`
-	AccountInfoID        string                   `json:"accountInfoId"`
+	GlobalAccountID      string                   `json:"globalAccountId"`           // 必填：国际版用户真实ID
 	AccountAddressID     string                   `json:"accountAddressId,omitempty"`
 	OrderAddtime         *JavaCompatibleTime      `json:"orderAddtime,omitempty"`
 	PayEffectiveTime     JavaCompatibleTime       `json:"payEffectiveTime"`
@@ -84,7 +83,7 @@ type SyncOrderDetailRequest struct {
 	Platform                int     `json:"platform"`
 	GoodsMid                string  `json:"goodsMid"`
 	GoodsImg                string  `json:"goodsImg,omitempty"`
-	GoodsName               string  `json:"goodsName,omitempty"`
+	GoodsName               string  `json:"goodsName"`               // 必填
 	GoodsNum                int     `json:"goodsNum,omitempty"`
 	GoodsAmountJp           float64 `json:"goodsAmountJp"`
 	GoodsAmountCn           float64 `json:"goodsAmountCn"`
@@ -92,13 +91,13 @@ type SyncOrderDetailRequest struct {
 	CommissionFeeCn         float64 `json:"commissionFeeCn"`
 	HandlingFeeJp           float64 `json:"handlingFeeJp"`
 	HandlingFeeCn           float64 `json:"handlingFeeCn"`
-	GoodsUrl                string  `json:"goodsUrl,omitempty"`
+	GoodsUrl                string  `json:"goodsUrl"`                // 必填
 	SellerID                string  `json:"sellerId,omitempty"`
 	ShippingFeeJp           float64 `json:"shippingFeeJp"`
 	ShippingFeeCn           float64 `json:"shippingFeeCn"`
 	OrderPurchaseType       int     `json:"orderPurchaseType,omitempty"`
 	PurchaseDirect          int     `json:"purchaseDirect,omitempty"`
-	DiscountType            int     `json:"discountType,omitempty"`
+	DiscountType            int     `json:"discountType"`            // 必填，无折扣传0
 }
 
 // PaymentSyncRequest matches the admin API's payment sync request.
@@ -139,6 +138,11 @@ type PaymentSyncResponse struct {
 
 // SyncOrder synchronizes an order to the admin backend.
 func (c *AdminSyncClient) SyncOrder(ctx context.Context, req *SyncOrderRequest) (*SyncOrderResponse, error) {
+	// 强校验：globalAccountId 必须有值
+	if req.GlobalAccountID == "" {
+		return nil, fmt.Errorf("[AdminSync] CRITICAL: globalAccountId不能为空")
+	}
+
 	url := fmt.Sprintf("%s/internal/global/order/sync", c.baseURL)
 
 	body, err := json.Marshal(req)
@@ -146,13 +150,20 @@ func (c *AdminSyncClient) SyncOrder(ctx context.Context, req *SyncOrderRequest) 
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
+	// 记录实际发送的关键参数
+	log.Printf("[AdminSync] >>> 发送订单同步请求:")
+	log.Printf("[AdminSync]     globalOrderNumber=%s", req.GlobalOrderNumber)
+	log.Printf("[AdminSync]     globalAccountId=%s", req.GlobalAccountID)
+	log.Printf("[AdminSync]     payEffectiveTime=%v", req.PayEffectiveTime)
+	log.Printf("[AdminSync]     orderTotalJp=%.2f", req.OrderTotalJp)
+	log.Printf("[AdminSync]     detailCount=%d", len(req.DetailList))
+	log.Printf("[AdminSync]     URL=%s", url)
+
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-
-	log.Printf("[AdminSync] Syncing order %s to admin: %s", req.GlobalOrderNumber, url)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -166,14 +177,16 @@ func (c *AdminSyncClient) SyncOrder(ctx context.Context, req *SyncOrderRequest) 
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		log.Printf("[AdminSync] <<< 订单同步失败: HTTP %d, message=%s", resp.StatusCode, result.Message)
 		return &result, fmt.Errorf("admin API returned status %d: %s", resp.StatusCode, result.Message)
 	}
 
 	if !result.Success {
+		log.Printf("[AdminSync] <<< 订单同步业务失败: %s", result.Message)
 		return &result, fmt.Errorf("admin API rejected sync: %s", result.Message)
 	}
 
-	log.Printf("[AdminSync] Order %s synced successfully (idempotent=%v)", req.GlobalOrderNumber, result.Idempotent)
+	log.Printf("[AdminSync] <<< 订单同步成功: orderNumber=%s, idempotent=%v", result.OrderNumber, result.Idempotent)
 	return &result, nil
 }
 
@@ -218,19 +231,37 @@ func (c *AdminSyncClient) SyncPayment(ctx context.Context, req *PaymentSyncReque
 }
 
 // ConvertOrderToSyncRequest converts a local order to admin sync request.
-func ConvertOrderToSyncRequest(order *domain.Order, details []domain.OrderDetail, userID string) *SyncOrderRequest {
+// globalAccountId 必须是国际版用户的真实唯一ID（从User.GlobalAccountID获取）
+func ConvertOrderToSyncRequest(order *domain.Order, details []domain.OrderDetail, globalAccountId string) *SyncOrderRequest {
+	// 强校验：globalAccountId 必须有值
+	if globalAccountId == "" {
+		log.Printf("[AdminSync] ERROR: globalAccountId is empty for order %s", order.OrderNumber)
+		// 不能继续，必须panic或返回错误
+		panic(fmt.Sprintf("globalAccountId不能为空，订单号: %s", order.OrderNumber))
+	}
+
 	// Generate unique request ID
 	requestID := fmt.Sprintf("INTL-SYNC-%s", order.OrderNumber)
 
 	// Convert order details
 	detailList := make([]SyncOrderDetailRequest, len(details))
 	for i, d := range details {
+		// 确保必填字段有值
+		goodsName := d.GoodsName
+		if goodsName == "" {
+			goodsName = "未知商品" // 兜底
+		}
+		goodsUrl := d.GoodsUrl
+		if goodsUrl == "" {
+			goodsUrl = "https://example.com/unknown" // 兜底
+		}
+
 		detailList[i] = SyncOrderDetailRequest{
 			GlobalOrderDetailNumber: fmt.Sprintf("%s-D%d", order.OrderNumber, i+1),
 			Platform:                1, // TODO: Map platform from product
 			GoodsMid:                d.GoodsMid,
 			GoodsImg:                d.GoodsImg,
-			GoodsName:               d.GoodsName,
+			GoodsName:               goodsName, // 必填
 			GoodsNum:                d.GoodsNum,
 			GoodsAmountJp:           float64(d.GoodsAmountJp) / 100.0,
 			GoodsAmountCn:           float64(d.GoodsAmountJp) / 100.0 * 0.05, // TODO: Use actual exchange rate
@@ -238,11 +269,13 @@ func ConvertOrderToSyncRequest(order *domain.Order, details []domain.OrderDetail
 			CommissionFeeCn:         float64(d.CommissionFeeJp) / 100.0 * 0.05,
 			HandlingFeeJp:           0,
 			HandlingFeeCn:           0,
-			GoodsUrl:                d.GoodsUrl,
+			GoodsUrl:                goodsUrl, // 必填
 			SellerID:                d.SellerID,
 			ShippingFeeJp:           float64(d.ShippingFeeJp) / 100.0,
 			ShippingFeeCn:           float64(d.ShippingFeeJp) / 100.0 * 0.05,
 			OrderPurchaseType:       order.OrderPurchaseType,
+			PurchaseDirect:          0,
+			DiscountType:            0, // 必填，无折扣传0
 		}
 	}
 
@@ -252,7 +285,7 @@ func ConvertOrderToSyncRequest(order *domain.Order, details []domain.OrderDetail
 	return &SyncOrderRequest{
 		RequestID:          requestID,
 		GlobalOrderNumber:  order.OrderNumber,
-		AccountInfoID:      userID,
+		GlobalAccountID:    globalAccountId, // 使用真实的国际版用户ID
 		PayEffectiveTime:   payEffectiveTime,
 		OrderTotalJp:       float64(order.OrderTotalJp) / 100.0,
 		OrderTotalCn:       float64(order.OrderTotalJp) / 100.0 * 0.05,
@@ -276,12 +309,19 @@ func ConvertOrderToSyncRequest(order *domain.Order, details []domain.OrderDetail
 }
 
 // SyncOrderAsync syncs order creation to admin backend (fire-and-forget).
-func (c *AdminSyncClient) SyncOrderAsync(ctx context.Context, order *domain.Order, details []domain.OrderDetail, userID string) {
+// globalAccountId 必须是国际版用户的真实唯一ID（从User.GlobalAccountID获取）
+func (c *AdminSyncClient) SyncOrderAsync(ctx context.Context, order *domain.Order, details []domain.OrderDetail, globalAccountId string) {
 	if !c.enabled {
 		return
 	}
 
-	req := ConvertOrderToSyncRequest(order, details, userID)
+	// 强校验：globalAccountId 必须有值
+	if globalAccountId == "" {
+		log.Printf("[AdminSync] CRITICAL ERROR: globalAccountId为空，订单号=%s，跳过同步", order.OrderNumber)
+		return
+	}
+
+	req := ConvertOrderToSyncRequest(order, details, globalAccountId)
 	
 	// Use background context with timeout
 	syncCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -294,8 +334,15 @@ func (c *AdminSyncClient) SyncOrderAsync(ctx context.Context, order *domain.Orde
 }
 
 // SyncPaymentAsync syncs payment success to admin backend (fire-and-forget).
-func (c *AdminSyncClient) SyncPaymentAsync(ctx context.Context, orderNumber string, paymentAmount int64, userID string) {
+// globalAccountId 必须是国际版用户的真实唯一ID
+func (c *AdminSyncClient) SyncPaymentAsync(ctx context.Context, orderNumber string, paymentAmount int64, globalAccountId string) {
 	if !c.enabled {
+		return
+	}
+
+	// 强校验
+	if globalAccountId == "" {
+		log.Printf("[AdminSync] CRITICAL ERROR: globalAccountId为空，订单号=%s，跳过支付同步", orderNumber)
 		return
 	}
 
@@ -310,6 +357,10 @@ func (c *AdminSyncClient) SyncPaymentAsync(ctx context.Context, orderNumber stri
 		PayTime:            JavaCompatibleTime{Time: time.Now()},
 		Operator:           "SYSTEM_INTL",
 	}
+
+	log.Printf("[AdminSync] >>> 发送支付同步请求:")
+	log.Printf("[AdminSync]     globalOrderNumber=%s", orderNumber)
+	log.Printf("[AdminSync]     payAmount=%.2f JPY", req.PayAmount)
 
 	// Use background context with timeout
 	syncCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
