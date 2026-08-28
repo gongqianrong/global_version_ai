@@ -333,6 +333,32 @@ func (c *AdminSyncClient) SyncOrderAsync(ctx context.Context, order *domain.Orde
 	}
 }
 
+// SyncOrderSync 同步调用订单同步接口，等待返回结果
+// 用于确保订单创建同步成功后才能继续后续操作（如支付同步）
+func (c *AdminSyncClient) SyncOrderSync(ctx context.Context, order *domain.Order, details []domain.OrderDetail, globalAccountId string) error {
+	if !c.enabled {
+		return nil // 如果未启用同步，返回成功（不阻塞）
+	}
+
+	// 强校验：globalAccountId 必须有值
+	if globalAccountId == "" {
+		err := fmt.Errorf("globalAccountId为空，订单号=%s", order.OrderNumber)
+		log.Printf("[AdminSync] CRITICAL ERROR: %v", err)
+		return err
+	}
+
+	req := ConvertOrderToSyncRequest(order, details, globalAccountId)
+	
+	_, err := c.SyncOrder(ctx, req)
+	if err != nil {
+		log.Printf("[AdminSync] Sync order failed for %s: %v", order.OrderNumber, err)
+		return fmt.Errorf("sync order failed: %w", err)
+	}
+	
+	log.Printf("[AdminSync] Order %s synced successfully", order.OrderNumber)
+	return nil
+}
+
 // SyncPaymentAsync syncs payment success to admin backend (fire-and-forget).
 // globalAccountId 必须是国际版用户的真实唯一ID
 func (c *AdminSyncClient) SyncPaymentAsync(ctx context.Context, orderNumber string, paymentAmount int64, globalAccountId string) {

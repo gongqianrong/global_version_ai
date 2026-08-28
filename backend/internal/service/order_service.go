@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/rakutao/collection-gateway/internal/domain"
 )
@@ -144,6 +145,7 @@ type CartRemover interface {
 
 // AdminSyncClient handles syncing to admin backend.
 type AdminSyncClient interface {
+	SyncOrderSync(ctx context.Context, order *domain.Order, details []domain.OrderDetail, globalAccountId string) error
 	SyncOrderAsync(ctx context.Context, order *domain.Order, details []domain.OrderDetail, globalAccountId string)
 	SyncPaymentAsync(ctx context.Context, orderNumber string, paymentAmount int64, globalAccountId string)
 }
@@ -277,7 +279,8 @@ func (s *OrderService) Confirm(ctx context.Context, userID int64, items []OrderI
 		return nil, fmt.Errorf("order_service: create order: %w", err)
 	}
 
-	// Sync to admin backend (async, best effort)
+	// Sync to admin backend (MUST complete before payment can be synced)
+	// 订单同步必须先完成，否则后续的支付同步会失败
 	if s.adminSync != nil {
 		// 获取用户的globalAccountId
 		user, err := s.users.GetByID(ctx, userID)
@@ -286,7 +289,18 @@ func (s *OrderService) Confirm(ctx context.Context, userID int64, items []OrderI
 		} else if user.GlobalAccountID == "" {
 			log.Printf("[order] CRITICAL: user %d has empty GlobalAccountID, skip admin sync", userID)
 		} else {
-			go s.adminSync.SyncOrderAsync(context.Background(), order, orderDetails, user.GlobalAccountID)
+			// 改为同步调用，确保订单创建同步成功后才能继续
+			// 使用独立的context避免超时影响主流程
+			syncCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			
+			syncErr := s.adminSync.SyncOrderSync(syncCtx, order, orderDetails, user.GlobalAccountID)
+			if syncErr != nil {
+				// 订单同步失败只记录日志，不影响订单创建
+				log.Printf("[order] WARNING: order sync failed for %s: %v", order.OrderNumber, syncErr)
+			} else {
+				log.Printf("[order] Order %s synced successfully to admin", order.OrderNumber)
+			}
 		}
 	}
 
